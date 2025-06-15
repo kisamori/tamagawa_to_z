@@ -1,0 +1,113 @@
+########################################
+#  Project: tamagawa-oa2z (.gitignore) #
+########################################
+
+#############
+# OS / IDE  #
+#############
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+#############
+# Python    #
+#############
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dylib
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Virtual-envs
+.venv/
+venv/
+env/
+.poetry/        # Poetry 仮想環境 in-repo モード
+.hatch/
+
+#############
+# Jupyter   #
+#############
+.ipynb_checkpoints/
+*.nbconvert.ipynb   # nbconvert 一時ファイル
+
+########################
+# Config / Secrets     #
+########################
+.env
+.env.*
+.envrc
+
+#############
+# Testing   #
+#############
+.pytest_cache/
+coverage.xml
+htmlcov/
+
+#######################
+# Data & Model assets #
+#######################
+data/
+!data/README.md       # ディレクトリ説明だけ残す
+models/
+!models/README.md
+outputs/
+hydra_outputs/        # Hydra デフォルト
+logs/
+flow_runs/            # Prefect 2.x
+
+# DVC & cache (使う場合)
+*.dvc
+.dvc/
+.cache/
+
+###################
+# Workflow / DAGs #
+###################
+airflow/          # SQLite DB・ログが肥大化する
+.flow/            # Prefect 1.x
+
+################
+# HPC/Slurm    #
+################
+slurm-*.out
+slurm-*.err
+
+####################
+# Binary artefacts #
+####################
+*.o
+*.mod
+*.exe
+
+##############################
+# Media (生成物は無視)       #
+##############################
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.gif
+*.bmp
+*.svg
+*.pdf
+docs/figures/
+!docs/figures/README.md
+
+########################################
+# (Optional) VS Code Jupyter kernels   #
+########################################
+.vscode/ipynb-*
+
+# End of file
