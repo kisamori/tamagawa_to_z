@@ -1,113 +1,118 @@
-########################################
-#  Project: tamagawa-oa2z (.gitignore) #
-########################################
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-#############
-# OS / IDE  #
-#############
-.DS_Store
-Thumbs.db
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*.bak
+*~
 
-#############
-# Python    #
-#############
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.so
-*.dylib
-*.egg-info/
-*.egg
-build/
-dist/
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Virtual-envs
-.venv/
-venv/
-env/
-.poetry/        # Poetry 仮想環境 in-repo モード
-.hatch/
+# Project specific
+/data/raw/
+/data/interim/
+/models/
+/output/
+/logs/
+*.log
 
-#############
-# Jupyter   #
-#############
-.ipynb_checkpoints/
-*.nbconvert.ipynb   # nbconvert 一時ファイル
-
-########################
-# Config / Secrets     #
-########################
-.env
-.env.*
-.envrc
-
-#############
-# Testing   #
-#############
-.pytest_cache/
-coverage.xml
-htmlcov/
-
-#######################
-# Data & Model assets #
-#######################
-data/
-!data/README.md       # ディレクトリ説明だけ残す
-models/
-!models/README.md
-outputs/
-hydra_outputs/        # Hydra デフォルト
-logs/
-flow_runs/            # Prefect 2.x
-
-# DVC & cache (使う場合)
-*.dvc
+# DVC
 .dvc/
-.cache/
+/dvc.lock
+/dvc.yaml
+/dvc.config
 
-###################
-# Workflow / DAGs #
-###################
-airflow/          # SQLite DB・ログが肥大化する
-.flow/            # Prefect 1.x
+# Hydra
+outputs/
+multirun/
 
-################
-# HPC/Slurm    #
-################
-slurm-*.out
-slurm-*.err
-
-####################
-# Binary artefacts #
-####################
-*.o
-*.mod
-*.exe
-
-##############################
-# Media (生成物は無視)       #
-##############################
-*.png
-*.jpg
-*.jpeg
+# Large files
 *.tif
 *.tiff
-*.gif
-*.bmp
-*.svg
-*.pdf
-docs/figures/
-!docs/figures/README.md
+*.nc
+*.h5
+*.hdf5
+*.zarr
+*.parquet
+*.feather
+*.pkl
+*.pickle
 
-########################################
-# (Optional) VS Code Jupyter kernels   #
-########################################
-.vscode/ipynb-*
-
-# End of file
+# Exceptions
+!config/**/*.yaml
+!config/**/*.yml
+!tests/data/**/*
