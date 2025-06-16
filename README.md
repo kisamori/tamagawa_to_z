@@ -14,9 +14,35 @@ tamagawa-to-z は、アマゾン流域における古河道や集落跡の探索
 2. **データ同化シミュレーション（System-B）**: 水理学データ同化と地形変化データ同化を組み合わせて、古河道の存在確率を推定します。
 3. **マルチエージェントシステム**: CrewAIを用いたマルチエージェントシステムにより、上記のコンポーネントを統合し、効率的な探索を実現します。
 
+## クイックスタート
+
+### セットアップ
+
+```bash
+# 1. リポジトリのクローン
+git clone https://github.com/username/tamagawa-to-z.git
+cd tamagawa-to-z
+
+# 2. Poetry を使用してインストール
+poetry install
+
+# 3. 必要なデータを配置
+# HydroRIVERS_SA.shp と GSW_occurrence.tif を data/raw/ に配置
+```
+
+### アクレ州パイプラインの実行
+
+```bash
+# スクリプトを使用して実行
+bash scripts/run_harmonizer.sh
+
+# または直接コマンドを実行
+poetry run python -m tamagawa_to_z acre-pipeline
+```
+
 ## インストール
 
-### Poetry を使用する場合
+### Poetry を使用する場合（推奨）
 
 ```bash
 # リポジトリのクローン
@@ -46,6 +72,20 @@ pip install -r requirements.txt
 ```
 
 ## 使い方
+
+### アクレ州マデイラ川上流西部のS-1〜S-5パイプライン
+
+このパイプラインは、アクレ州マデイラ川上流西部の水場系トポニムを抽出し、古河道候補地点を特定します。
+
+```bash
+# パイプラインの実行
+poetry run python -m tamagawa_to_z acre-pipeline --out data/interim/acre_candidates.parquet
+
+# オプションパラメータ
+# --rivers: HydroRIVERSファイルのパス（デフォルト: data/raw/HydroRIVERS_SA.shp）
+# --gsw: GSW occurrenceファイルのパス（デフォルト: data/raw/GSW_occurrence.tif）
+# --log-level: ログレベル（デフォルト: INFO）
+```
 
 ### コマンドラインインターフェース
 
@@ -128,6 +168,10 @@ tamagawa-to-z/
 │   │   ├── config/            # 設定
 │   │   ├── data/              # 軽量リソース
 │   │   ├── harmonizer/        # System-A
+│   │   │   ├── preprocess.py  # S-1, S-2, S-3
+│   │   │   ├── distance.py    # S-4
+│   │   │   ├── watermask.py   # S-5 (GSW)
+│   │   │   └── agent.py       # S-5 (LLM)
 │   │   ├── hydro_da/          # System-B-A
 │   │   ├── morph_da/          # System-B-B
 │   │   ├── agents/            # CrewAI wrappers
@@ -143,8 +187,11 @@ tamagawa-to-z/
 │   └── test_da.py
 │
 ├── data/               # データ（Gitに含めない）
-│   ├── raw/
-│   └── interim/
+│   ├── raw/            # 入力データ
+│   │   ├── HydroRIVERS_SA.shp  # 南米河川ネットワーク
+│   │   └── GSW_occurrence.tif  # 水域頻度
+│   └── interim/        # 中間データ
+│       └── acre_candidates.parquet  # 候補地点
 │
 ├── models/             # モデル（Git-LFS or DVC）
 │
@@ -201,3 +248,4 @@ tamagawa-to-z/
   year = {2025},
   url = {https://github.com/username/tamagawa-to-z}
 }
+```

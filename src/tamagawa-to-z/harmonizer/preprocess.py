@@ -1,20 +1,151 @@
-# DEMO FILE: トポニム前処理モジュール
-
 """
 preprocess: 地名（トポニム）の前処理モジュール
 
 このモジュールは、地名データの正規化や前処理のための機能を提供します。
+S-1: 対象地域のBBox定義
+S-2: 水場系トポニムの抽出
+S-3: クレンジング & タイプ付け
 """
 
+import re
+import requests
+import unidecode
 import pandas as pd
 import geopandas as gpd
-import unidecode
-import re
-from typing import List, Union
+from shapely.geometry import box, Point
+from typing import List, Union, Dict, Any, Optional
 
 
-def normalize_text(text: str) -> str:
-    """テキストを正規化する
+# S-1: 対象地域のBBox定義
+ACRE_BBOX = box(-70.5, -11.5, -66.5, -8.5)   # lon_min, lat_min, lon_max, lat_max
+
+def make_bbox_gdf():
+    """アクレ州マデイラ川上流西部のBBoxをGeoDataFrameとして返す
+    
+    Returns
+    -------
+    gpd.GeoDataFrame
+        BBoxを含むGeoDataFrame
+    """
+    return gpd.GeoDataFrame({"id": [1]}, geometry=[ACRE_BBOX], crs="EPSG:4326")
+
+
+# S-2: 水場系トポニムの抽出
+# 水関連キーワードの正規表現パターン
+KW = re.compile(r'(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]')
+
+def bngeb_fetch(bbox, page=1):
+    """BNGB APIから地名データを取得する
+    
+    Parameters
+    ----------
+    bbox : shapely.geometry.box
+        検索範囲のバウンディングボックス
+    page : int, optional
+        ページ番号
+        
+    Returns
+    -------
+    list
+        地名データのリスト
+    """
+    url = ("https://servicodados.ibge.gov.br/api/v3/bcgn/nomes?"
+           f"latitude={bbox.bounds[1]}&longitude={bbox.bounds[0]}"
+           f"&latitude2={bbox.bounds[3]}&longitude2={bbox.bounds[2]}"
+           "&categoria=hidrografia&page=" + str(page))
+    return requests.get(url, timeout=30).json()
+
+def collect_names(bbox):
+    """BNGBから水関連の地名を収集する
+    
+    Parameters
+    ----------
+    bbox : shapely.geometry.box
+        検索範囲のバウンディングボックス
+        
+    Returns
+    -------
+    gpd.GeoDataFrame
+        収集された地名データ
+    """
+    rec, page = [], 1
+    while True:
+        data = bngeb_fetch(bbox, page)
+        if not data: 
+            break
+        for d in data:
+            if KW.search(d["nome"].lower()):
+                rec.append({
+                    "name": d["nome"],
+                    "geometry": Point(float(d["longitude"]), float(d["latitude"])),
+                    "source": "bngb"
+                })
+        page += 1
+    return gpd.GeoDataFrame(rec, crs="EPSG:4326")
+
+def collect_osm_names(bbox):
+    """OpenStreetMapから水関連の地名を収集する
+    
+    Parameters
+    ----------
+    bbox : shapely.geometry.box
+        検索範囲のバウンディングボックス
+        
+    Returns
+    -------
+    gpd.GeoDataFrame
+        収集された地名データ
+    """
+    # Overpass APIのクエリ
+    overpass_url = "https://overpass-api.de/api/interpreter"
+    
+    # バウンディングボックスの座標を取得
+    south, west, north, east = bbox.bounds
+    
+    # 水関連の名前を持つノードを検索するクエリ
+    query = f"""
+    [out:json];
+    (
+      node["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
+      way["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
+      relation["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
+    );
+    out center;
+    """
+    
+    # APIリクエスト
+    response = requests.post(overpass_url, data={"data": query}, timeout=60)
+    data = response.json()
+    
+    # 結果の処理
+    records = []
+    for element in data.get("elements", []):
+        # ノードの場合
+        if element["type"] == "node":
+            lat, lon = element["lat"], element["lon"]
+        # ウェイまたはリレーションの場合（中心点を使用）
+        else:
+            lat, lon = element.get("center", {}).get("lat"), element.get("center", {}).get("lon")
+        
+        # 座標が取得できた場合のみ追加
+        if lat and lon:
+            records.append({
+                "name": element.get("tags", {}).get("name", "Unknown"),
+                "geometry": Point(lon, lat),
+                "source": "osm"
+            })
+    
+    # GeoDataFrameに変換
+    if records:
+        return gpd.GeoDataFrame(records, crs="EPSG:4326")
+    else:
+        # 空のGeoDataFrameを返す
+        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+
+
+# S-3: クレンジング & タイプ付け
+def normalize_name(s: str) -> str:
+    """地名を正規化する
     
     1. 小文字化
     2. アクセント除去
@@ -23,134 +154,98 @@ def normalize_text(text: str) -> str:
     
     Parameters
     ----------
-    text : str
-        正規化するテキスト
+    s : str
+        正規化する地名
         
     Returns
     -------
     str
-        正規化されたテキスト
+        正規化された地名
     """
     # 小文字化
-    text = text.lower()
+    s = s.lower()
     
     # アクセント除去
-    text = unidecode.unidecode(text)
+    s = unidecode.unidecode(s)
     
     # 英数字とスペース、ハイフン以外を空白に置換
-    text = re.sub(r'[^a-z0-9\s-]', ' ', text)
+    s = re.sub(r"[^a-z0-9\s-]", " ", s)
     
     # 余分な空白を削除
-    text = re.sub(r'\s+', ' ', text).strip()
+    s = re.sub(r"\s+", " ", s).strip()
     
-    return text
+    return s
 
-
-def normalize_toponyms(toponyms: Union[pd.DataFrame, gpd.GeoDataFrame]) -> gpd.GeoDataFrame:
-    """地名データを正規化する
+def infer_type(name: str) -> Optional[str]:
+    """地名から水系タイプを推定する
     
     Parameters
     ----------
-    toponyms : Union[pd.DataFrame, gpd.GeoDataFrame]
+    name : str
+        正規化された地名
+        
+    Returns
+    -------
+    str or None
+        推定された水系タイプ
+    """
+    for kw in ["igarape", "igapo", "lagoa", "baixio", "porto", "furo", "parana"]:
+        if kw in name:
+            return kw
+    return None
+
+def process_toponyms(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """地名データを処理する
+    
+    Parameters
+    ----------
+    gdf : gpd.GeoDataFrame
         地名データ
         
     Returns
     -------
     gpd.GeoDataFrame
-        正規化された地名データ
+        処理された地名データ
     """
     # コピーを作成
-    processed = toponyms.copy()
+    processed = gdf.copy()
     
-    # 'name' カラムがない場合はエラー
-    if 'name' not in processed.columns:
-        raise ValueError("DataFrame must have a 'name' column")
+    # 正規化
+    processed["normalized_name"] = processed["name"].apply(normalize_name)
     
-    # 正規化を適用
-    processed['normalized_name'] = processed['name'].apply(normalize_text)
-    
-    # 言語情報の追加（存在しない場合）
-    if 'language' not in processed.columns:
-        # 簡易的な言語推定（実際の実装ではより高度な方法を使用）
-        processed['language'] = 'unknown'
+    # タイプ推定
+    processed["type"] = processed["normalized_name"].apply(infer_type)
     
     return processed
 
-
-def extract_name_parts(toponyms: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """地名から構成要素を抽出する
-    
-    例: "Rio Amazonas" -> ["rio", "amazonas"]
+def merge_toponyms(bngb_gdf: gpd.GeoDataFrame, osm_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """BNGBとOSMの地名データをマージする
     
     Parameters
     ----------
-    toponyms : gpd.GeoDataFrame
-        正規化された地名データ
+    bngb_gdf : gpd.GeoDataFrame
+        BNGBから収集された地名データ
+    osm_gdf : gpd.GeoDataFrame
+        OSMから収集された地名データ
         
     Returns
     -------
     gpd.GeoDataFrame
-        構成要素が追加された地名データ
+        マージされた地名データ
     """
-    # コピーを作成
-    processed = toponyms.copy()
+    # 空のDataFrameチェック
+    if bngb_gdf.empty and osm_gdf.empty:
+        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+    elif bngb_gdf.empty:
+        return osm_gdf
+    elif osm_gdf.empty:
+        return bngb_gdf
     
-    # 'normalized_name' カラムがない場合はエラー
-    if 'normalized_name' not in processed.columns:
-        raise ValueError("DataFrame must have a 'normalized_name' column")
+    # マージ
+    merged = pd.concat([bngb_gdf, osm_gdf], ignore_index=True)
     
-    # 構成要素の抽出
-    processed['name_parts'] = processed['normalized_name'].apply(lambda x: x.split())
+    # GeoDataFrameに変換
+    if not isinstance(merged, gpd.GeoDataFrame):
+        merged = gpd.GeoDataFrame(merged, geometry="geometry", crs="EPSG:4326")
     
-    # 先頭要素（通常は地物タイプ）
-    processed['prefix'] = processed['name_parts'].apply(lambda x: x[0] if len(x) > 0 else "")
-    
-    # 残りの要素（通常は固有名詞）
-    processed['suffix'] = processed['name_parts'].apply(lambda x: " ".join(x[1:]) if len(x) > 1 else "")
-    
-    return processed
-
-
-def filter_water_related(toponyms: gpd.GeoDataFrame, 
-                         water_prefixes: List[str],
-                         threshold: float = 0.5) -> gpd.GeoDataFrame:
-    """水関連の地名をフィルタリングする
-    
-    Parameters
-    ----------
-    toponyms : gpd.GeoDataFrame
-        地名データ
-    water_prefixes : List[str]
-        水関連の接頭辞リスト
-    threshold : float, optional
-        水関連度の閾値
-        
-    Returns
-    -------
-    gpd.GeoDataFrame
-        水関連の地名のみを含むデータ
-    """
-    # 'prefix' カラムがない場合は抽出
-    if 'prefix' not in toponyms.columns:
-        toponyms = extract_name_parts(toponyms)
-    
-    # 水関連度の計算
-    def calculate_water_score(row):
-        # 接頭辞が水関連リストに含まれる場合
-        if row['prefix'] in water_prefixes:
-            return 1.0
-        
-        # 特徴タイプによる判定
-        if 'feature_type' in row and row['feature_type'] in ['river', 'stream', 'lake', 'channel', 'waterfall']:
-            return 0.9
-        
-        # デフォルト（水関連度低）
-        return 0.1
-    
-    # 水関連度の計算
-    toponyms['water_score'] = toponyms.apply(calculate_water_score, axis=1)
-    
-    # 閾値以上の水関連度を持つ地名をフィルタリング
-    water_related = toponyms[toponyms['water_score'] >= threshold].copy()
-    
-    return water_related
+    return merged
