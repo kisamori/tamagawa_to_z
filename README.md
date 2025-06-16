@@ -1,7 +1,7 @@
 # tamagawa_to_z
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/poetry-1.4.0+-blue.svg)](https://python-poetry.org/)
 
 アマゾン古河道・集落探索に向けた多言語トポニム解析フレームワーク
@@ -16,6 +16,10 @@ tamagawa_to_z は、アマゾン流域における古河道や集落跡の探索
 
 ### セットアップ
 
+**前提条件:**
+- Python 3.10以上が必要です（3.8や3.9では動作しません）
+- 地理空間ライブラリ（特にpyproj、geopandas）がPython 3.10以上を要求します
+
 ```bash
 # 1. リポジトリのクローン
 git clone https://github.com/username/tamagawa_to_z.git
@@ -25,7 +29,38 @@ cd tamagawa_to_z
 poetry install
 
 # 3. 必要なデータを配置
-# HydroRIVERS_SA.shp と GSW_occurrence.tif を data/raw/ に配置
+
+### 必要なデータファイル
+
+| ファイル名 | 内容 | 入手先 | 役割 |
+|-----------|------|--------|------|
+| `HydroRIVERS_SA.shp` | 南米河川ネットワーク（約95MB） | [HydroSHEDS](https://hydrosheds.org) | 現河道との距離計算 |
+| `GSW_occurrence.tif` | 水面出現頻度データ（1984-2021） | [GSW ポータル](https://global-surface-water.appspot.com) | 水域頻度判定 |
+
+**注意:** ファイルサイズが大きいため、各自でダウンロードが必要です。
+
+### 手動ダウンロード手順
+
+#### 1. HydroRIVERS の取得
+```bash
+# ダウンロード・展開
+wget -O hydrorivers_sa.zip "https://data.hydrosheds.org/file/HydroRIVERS/SA_HydroRIVERS_v10_shp.zip"
+unzip hydrorivers_sa.zip -d data/raw/hydrorivers_sa
+ln -s data/raw/hydrorivers_sa/HydroRIVERS_SA.shp data/raw/
+```
+
+#### 2. GSW occurrence の取得
+1. [GSW ポータル](https://global-surface-water.appspot.com) で 70°W~60°W / 0°~-20° のタイルをダウンロード
+2. 複数タイルがある場合は結合：
+```bash
+gdal_merge.py -o data/raw/GSW_occurrence_raw.tif tile*.tif
+gdal_translate -projwin -70.5 -8.5 -66.5 -11.5 data/raw/GSW_occurrence_raw.tif data/raw/GSW_occurrence.tif
+```
+
+#### 3. 配置確認
+```bash
+ls data/raw/  # HydroRIVERS_SA.shp と GSW_occurrence.tif があることを確認
+```
 ```
 
 ### Jupyter Notebookでの実行
@@ -36,6 +71,8 @@ poetry run jupyter notebook notebooks/01_harmonizer.ipynb
 ```
 
 ## インストール
+
+**注意:** このプロジェクトはPython 3.10以上が必要です。pyenvなどを使用して適切なPythonバージョンを設定してください。
 
 ### Poetry を使用する場合（推奨）
 
@@ -50,9 +87,14 @@ poetry install
 
 ### Kaggle で使用する場合
 
+**注意:** Kaggleでも Python 3.10以上のランタイムを選択してください。
+
 ```bash
 # requirements.txt を使用してインストール
 pip install -r requirements.txt
+
+# または以下のようにKaggleノートブックの先頭に記述
+!pip install git+https://github.com/username/tamagawa_to_z.git
 ```
 
 ## 使い方
@@ -97,7 +139,7 @@ candidates.to_parquet("data/interim/acre_candidates.parquet")
 tamagawa_to_z/
 ├── README.md           # このファイル
 ├── LICENSE             # MITライセンス
-├── pyproject.toml      # Poetry設定
+├── pyproject.toml      # Poetry設定（Python 3.10以上が必要）
 ├── requirements.txt    # Kaggle用依存関係
 ├── .gitignore          # Git除外設定
 │
