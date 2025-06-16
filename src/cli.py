@@ -3,7 +3,7 @@
 """
 CLI: コマンドラインインターフェース
 
-このモジュールは、tamagawa-to-z パッケージのコマンドラインインターフェースを提供します。
+このモジュールは、tamagawa_to_z パッケージのコマンドラインインターフェースを提供します。
 """
 
 import os
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     """
     # パーサーの作成
     parser = argparse.ArgumentParser(
-        description='tamagawa-to-z: アマゾン古河道・集落探索フレームワーク',
+        description='tamagawa_to_z: アマゾン古河道・集落探索フレームワーク',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     

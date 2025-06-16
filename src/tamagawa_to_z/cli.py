@@ -1,7 +1,7 @@
 """
 CLI: コマンドラインインターフェース
 
-このモジュールは、tamagawa-to-z パッケージのコマンドラインインターフェースを提供します。
+このモジュールは、tamagawa_to_z パッケージのコマンドラインインターフェースを提供します。
 """
 
 import os
@@ -47,7 +47,7 @@ def setup_logging(log_level: str = 'INFO') -> None:
 
 @click.group()
 def cli():
-    """tamagawa-to-z: アマゾン古河道・集落探索フレームワーク"""
+    """tamagawa_to_z: アマゾン古河道・集落探索フレームワーク"""
     pass
 
 

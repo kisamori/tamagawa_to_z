@@ -1,11 +1,15 @@
+# DEMO FILE: utils パッケージ初期化
+
 """
 utils: ユーティリティモジュール
 
-このパッケージは、tamagawa-to-z フレームワークで使用される
-ユーティリティ関数を提供します。
+このモジュールは、プロジェクト全体で使用される共通のユーティリティ関数を提供します。
 """
 
-# 将来的にはここに実際のユーティリティモジュールをインポートします
-# 例: from tamagawa_to_z.utils.io import load_vector, save_vector
+# サブモジュールのインポート
+from . import io
+from . import viz
+from . import geo
+from . import metrics
 
-__all__ = []
+__all__ = ['io', 'viz', 'geo', 'metrics']

@@ -29,11 +29,18 @@ from tamagawa_to_z.harmonizer.watermask import (
 )
 
 from tamagawa_to_z.harmonizer.agent import (
-    filter_with_agent,
-    batch_filter_with_agent,
+    filter_candidates,
     score_candidates
 )
 
+# メインクラスのインポート（条件付き）
+try:
+    from tamagawa_to_z.harmonizer.harmonizer import Harmonizer
+    _has_harmonizer = True
+except ImportError:
+    _has_harmonizer = False
+
+# __all__リストの作成
 __all__ = [
     # preprocess
     'normalize_name',
@@ -55,8 +62,11 @@ __all__ = [
     'classify_by_occurrence',
     'find_paleo_candidates',
     
-    # agent
-    'filter_with_agent',
-    'batch_filter_with_agent',
+    # candidate
+    'filter_candidates',
     'score_candidates'
 ]
+
+# Harmonizerクラスが利用可能な場合は__all__に追加
+if _has_harmonizer:
+    __all__.append('Harmonizer')
