@@ -27,10 +27,11 @@ cd tamagawa_to_z
 
 # 2. Poetry を使用してインストール
 poetry install
+```
 
-# 3. 必要なデータを配置
+### 3. 必要なデータを配置
 
-### 必要なデータファイル
+#### 必要なデータファイル
 
 | ファイル名 | 内容 | 入手先 | 役割 |
 |-----------|------|--------|------|
@@ -61,8 +62,6 @@ gdal_translate -projwin -70.5 -8.5 -66.5 -11.5 data/raw/GSW_occurrence_raw.tif d
 ```bash
 ls data/raw/  # HydroRIVERS_SA.shp と GSW_occurrence.tif があることを確認
 ```
-```
-
 ### Jupyter Notebookでの実行
 
 ```bash
