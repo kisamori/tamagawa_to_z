@@ -45,6 +45,7 @@ from tamagawa_to_z.harmonizer import (
     make_bbox_gdf, process_toponyms,
     attach_distance, water_occurrence, filter_candidates, score_candidates
 )
+from tamagawa_to_z.harmonizer.preprocess import ACRE_BBOX
 
 
 def parse_args():
@@ -92,7 +93,17 @@ def parse_args():
         default=str(PROJECT_ROOT / 'data/raw/osm/norte-latest.osm.pbf'),
         help='PBFファイルのパス'
     )
-    
+
+    # BBOX オプション
+    parser.add_argument(
+        '--bbox',
+        type=float,
+        nargs=4,
+        metavar=('LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'),
+        default=list(ACRE_BBOX.bounds),
+        help='対象領域のBBOX (lon_min lat_min lon_max lat_max)'
+    )
+
     return parser.parse_args()
 
 
@@ -122,12 +133,12 @@ def ensure_data_dirs():
     logger.info("データディレクトリを確認しました")
 
 
-def step1_define_bbox(visualize=False):
+def step1_define_bbox(bbox_coords, visualize=False):
     """S-1: 対象地域のBBox定義"""
     logger.info("S-1: 対象地域のBBox定義を実行中...")
-    
+
     # BBoxの作成
-    bbox_gdf = make_bbox_gdf()
+    bbox_gdf = make_bbox_gdf(*bbox_coords)
     bbox = bbox_gdf.geometry.iloc[0]
     logger.info(f"対象領域の境界: {bbox.bounds}")
     
@@ -329,7 +340,7 @@ def main():
         logger.warning("一部のデータファイルが見つかりません。可能な処理のみ実行します。")
     
     # S-1: 対象地域のBBox定義
-    bbox_gdf = step1_define_bbox(visualize=args.visualize)
+    bbox_gdf = step1_define_bbox(args.bbox, visualize=args.visualize)
     
     # S-2: 水場系トポニムの抽出
     names = step2_extract_toponyms(bbox_gdf, visualize=args.visualize, use_pyrosm=True, pbf_path=args.pbf_path)

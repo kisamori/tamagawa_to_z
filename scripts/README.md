@@ -37,6 +37,7 @@ python scripts/run_harmonizer.py --rivers_path データ/HydroRIVERS.shp --gsw_p
 - `--gsw_path PATH`: GSW occurrenceのTIFFファイルパス（デフォルト: `data/raw/occurrence_70W_10Sv1_4_2021.tif`）
 - `--output_path PATH`: 出力ファイルパス（デフォルト: `data/interim/acre_candidates.parquet`）
 - `--visualize`: 処理結果を可視化する（デフォルト: False）
+- `--bbox LON_MIN LAT_MIN LON_MAX LAT_MAX`: 対象領域のBBoxを指定（デフォルト: `-70.5 -11.5 -66.5 -8.5`）
 
 ### 処理ステップ
 
