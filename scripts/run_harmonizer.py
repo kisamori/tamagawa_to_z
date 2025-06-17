@@ -57,13 +57,13 @@ def parse_args():
     parser.add_argument(
         '--rivers_path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/raw/HydroRIVERS_v10_sa.shp'),
+        default=str(PROJECT_ROOT / 'data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp'),
         help='HydroRIVERSのシェープファイルパス'
     )
     parser.add_argument(
         '--gsw_path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/raw/occurrence_70W_10Sv1_4_2021.tif'),
+        default=str(PROJECT_ROOT / 'data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif'),
         help='GSW occurrenceのTIFFファイルパス'
     )
     parser.add_argument(
@@ -78,6 +78,19 @@ def parse_args():
         '--visualize', 
         action='store_true',
         help='処理結果を可視化する'
+    )
+    
+    # Pyrosmオプション
+    parser.add_argument(
+        '--use-pyrosm',
+        action='store_true',
+        help='PyrosmでローカルPBFファイルからデータを取得する'
+    )
+    parser.add_argument(
+        '--pbf-path',
+        type=str,
+        default=str(PROJECT_ROOT / 'data/raw/osm/norte-latest.osm.pbf'),
+        help='PBFファイルのパス'
     )
     
     return parser.parse_args()
@@ -129,36 +142,24 @@ def step1_define_bbox(visualize=False):
     return bbox_gdf
 
 
-def step2_extract_toponyms(bbox_gdf, visualize=False):
+def step2_extract_toponyms(bbox_gdf, visualize=False, use_pyrosm=False, pbf_path=None):
     """S-2: 水場系トポニムの抽出"""
     logger.info("S-2: 水場系トポニムの抽出を実行中...")
     bbox = bbox_gdf.geometry.iloc[0]
     
-    # BNGB APIからトポニムを収集（エラーハンドリング付き）
-    logger.info("BNGBからトポニムを収集しています...")
+    # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
+    logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
     try:
-        bngb_names = collect_names(bbox)
-        if bngb_names.empty:
-            logger.warning("BNGBからのデータ取得に失敗しました。APIが一時的に利用できない可能性があります。")
+        from tamagawa_to_z.harmonizer.preprocess import extract_acre_toponyms_pyrosm
+        names = extract_acre_toponyms_pyrosm(bbox, pbf_path)
+        if names.empty:
+            logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
-            logger.info(f"BNGBから{len(bngb_names)}件のトポニムを収集しました")
+            logger.info(f"ローカルPBFから{len(names)}件のトポニムを収集しました")
     except Exception as e:
-        logger.error(f"BNGBデータ収集中にエラーが発生しました: {e}")
-        logger.warning("BNGBデータなしで処理を続行します")
-        bngb_names = gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    
-    # OpenStreetMapからトポニムを収集
-    logger.info("OpenStreetMapからトポニムを収集しています...")
-    try:
-        osm_names = collect_osm_names(bbox)
-        logger.info(f"OpenStreetMapから{len(osm_names)}件のトポニムを収集しました")
-    except Exception as e:
-        logger.error(f"OpenStreetMapデータ収集中にエラーが発生しました: {e}")
-        logger.warning("OpenStreetMapデータなしで処理を続行します")
-        osm_names = gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    
-    # トポニムのマージ
-    names = merge_toponyms(bngb_names, osm_names)
+        logger.error(f"ローカルPBFデータ収集中にエラーが発生しました: {e}")
+        logger.warning("空のデータセットで処理を続行します")
+        names = gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
     
     if names.empty:
         logger.warning("どのソースからもトポニムを収集できませんでした。処理を続行できない可能性があります。")
@@ -330,7 +331,7 @@ def main():
     bbox_gdf = step1_define_bbox(visualize=args.visualize)
     
     # S-2: 水場系トポニムの抽出
-    names = step2_extract_toponyms(bbox_gdf, visualize=args.visualize)
+    names = step2_extract_toponyms(bbox_gdf, visualize=args.visualize, use_pyrosm=True, pbf_path=args.pbf_path)
     
     # S-3: クレンジング & タイプ付け
     names = step3_process_toponyms(names, visualize=args.visualize)
