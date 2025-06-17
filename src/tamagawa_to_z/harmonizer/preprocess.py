@@ -19,15 +19,28 @@ from pathlib import Path
 # S-1: 対象地域のBBox定義
 ACRE_BBOX = box(-70.5, -11.5, -66.5, -8.5)   # lon_min, lat_min, lon_max, lat_max
 
-def make_bbox_gdf():
-    """Returns the BBox of Western Upper Madeira River, Acre State as a GeoDataFrame
-    
+def make_bbox_gdf(
+    lon_min: float = ACRE_BBOX.bounds[0],
+    lat_min: float = ACRE_BBOX.bounds[1],
+    lon_max: float = ACRE_BBOX.bounds[2],
+    lat_max: float = ACRE_BBOX.bounds[3],
+) -> gpd.GeoDataFrame:
+    """指定した範囲のBBoxをGeoDataFrameとして返す
+
+    Parameters
+    ----------
+    lon_min, lat_min, lon_max, lat_max : float, optional
+        バウンディングボックスの四隅の座標。
+        省略時はアクレ州西部 (``ACRE_BBOX``) を使用する。
+
     Returns
     -------
     gpd.GeoDataFrame
         GeoDataFrame containing the BBox
     """
-    return gpd.GeoDataFrame({"id": [1]}, geometry=[ACRE_BBOX], crs="EPSG:4326")
+
+    bbox = box(lon_min, lat_min, lon_max, lat_max)
+    return gpd.GeoDataFrame({"id": [1]}, geometry=[bbox], crs="EPSG:4326")
 
 
 # S-2: 水場系トポニムの抽出

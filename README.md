@@ -132,6 +132,15 @@ candidates = score_candidates(candidates)
 candidates.to_parquet("data/interim/acre_candidates.parquet")
 ```
 
+### Pythonスクリプト
+
+Notebook を使わずコマンドラインから実行する場合は `scripts/run_harmonizer.py`
+を利用します。BBOX を変更したい場合は `--bbox` オプションで緯度経度を指定します。
+
+```bash
+python scripts/run_harmonizer.py --bbox -70.5 -11.5 -66.5 -8.5
+```
+
 ## プロジェクト構成
 
 ```
