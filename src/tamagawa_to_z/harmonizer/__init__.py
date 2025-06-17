@@ -9,9 +9,6 @@ from tamagawa_to_z.harmonizer.preprocess import (
     normalize_name,
     infer_type,
     make_bbox_gdf,
-    collect_names,
-    collect_osm_names,
-    merge_toponyms,
     process_toponyms
 )
 
@@ -46,9 +43,6 @@ __all__ = [
     'normalize_name',
     'infer_type',
     'make_bbox_gdf',
-    'collect_names',
-    'collect_osm_names',
-    'merge_toponyms',
     'process_toponyms',
     
     # distance

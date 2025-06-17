@@ -8,12 +8,11 @@ S-3: クレンジング & タイプ付け
 """
 
 import re
-import requests
 import unidecode
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import box, Point
-from typing import List, Union, Dict, Any, Optional
+from shapely.geometry import box
+from typing import Optional
 from pathlib import Path
 
 
@@ -32,8 +31,6 @@ def make_bbox_gdf():
 
 
 # S-2: 水場系トポニムの抽出
-# 水関連キーワードの正規表現パターン（既存のOverpass API用）
-KW = re.compile(r'(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]')
 
 # 拡張された水語彙パターン（Pyrosm用）
 WATER_TOKENS_EXTENDED = re.compile(r'(?i)\b(' \
@@ -47,198 +44,8 @@ EXCLUDE_WATER_TAGS = ["waterway", "natural", "water", "wetland", "riverbank"]
 # 取得対象のname系カラム
 NAME_COLS = ["name", "alt_name", "old_name", "loc_name"]
 
-def bngeb_fetch(bbox, page=1):
-    """BNGB APIから地名データを取得する
-    
-    Parameters
-    ----------
-    bbox : shapely.geometry.box
-        検索範囲のバウンディングボックス
-    page : int, optional
-        ページ番号
-        
-    Returns
-    -------
-    list
-        地名データのリスト。エラー時は空リストを返す。
-    """
-    url = ("https://servicodados.ibge.gov.br/api/v3/bcgn/nomes?"
-           f"latitude={bbox.bounds[1]}&longitude={bbox.bounds[0]}"
-           f"&latitude2={bbox.bounds[3]}&longitude2={bbox.bounds[2]}"
-           "&categoria=hidrografia&page=" + str(page))
-    
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()  # HTTPエラーをチェック
-        
-        # レスポンスが空でないかチェック
-        if not response.text.strip():
-            print(f"警告: BNGB APIからの空のレスポンス（ページ {page}）")
-            return []
-        
-        # JSONパースを試行
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"ネットワークエラー: {e}")
-        return []
-    except ValueError as e:  # JSON decode error
-        print(f"JSONデコードエラー: {e}")
-        print(f"レスポンス内容: {response.text[:200]}...")  # 最初の200文字だけ表示
-        return []
 
-def collect_names(bbox, use_pyrosm=False, pbf_path=None):
-    """BNGBから水関連の地名を収集する
-    
-    Parameters
-    ----------
-    bbox : shapely.geometry.box
-        検索範囲のバウンディングボックス
-    use_pyrosm : bool, optional
-        Pyrosmを使用してローカルPBFファイルから追加データを取得するかどうか
-    pbf_path : str, optional
-        PBFファイルのパス（use_pyrosm=Trueの場合のみ使用）
-        
-    Returns
-    -------
-    gpd.GeoDataFrame
-        収集された地名データ。APIエラー時は空のGeoDataFrameを返す。
-    """
-    rec, page = [], 1
-    max_retries = 3
-    retry_count = 0
-    
-    try:
-        while retry_count < max_retries:
-            data = bngeb_fetch(bbox, page)
-            if not data:
-                # データがない場合はリトライするか終了
-                if retry_count < max_retries - 1:
-                    print(f"BNGB APIからデータを取得できませんでした。リトライ中... ({retry_count + 1}/{max_retries})")
-                    retry_count += 1
-                    import time
-                    time.sleep(2)  # 2秒待機してからリトライ
-                else:
-                    print("BNGB APIからのデータ取得を諦めます。")
-                    break
-            else:
-                # データが取得できたらリトライカウントをリセット
-                retry_count = 0
-                for d in data:
-                    if KW.search(d["nome"].lower()):
-                        rec.append({
-                            "name": d["nome"],
-                            "geometry": Point(float(d["longitude"]), float(d["latitude"])),
-                            "source": "bngb"
-                        })
-                page += 1
-    except Exception as e:
-        print(f"地名収集中にエラーが発生しました: {e}")
-    
-    # BNGBの結果をGeoDataFrameに変換
-    bngb_gdf = gpd.GeoDataFrame(rec, crs="EPSG:4326") if rec else gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    
-    # Pyrosmを使用する場合は追加データを取得
-    if use_pyrosm:
-        print("Pyrosmを使用してローカルPBFから追加データを取得中...")
-        pyrosm_gdf = extract_acre_toponyms_pyrosm(bbox, pbf_path)
-        
-        # BNGBとPyrosmのデータをマージ
-        if not bngb_gdf.empty and not pyrosm_gdf.empty:
-            combined_gdf = pd.concat([bngb_gdf, pyrosm_gdf], ignore_index=True)
-            combined_gdf = gpd.GeoDataFrame(combined_gdf, geometry="geometry", crs="EPSG:4326")
-            print(f"統合結果: BNGB({len(bngb_gdf)}件) + Pyrosm({len(pyrosm_gdf)}件) = {len(combined_gdf)}件")
-            return combined_gdf
-        elif not pyrosm_gdf.empty:
-            print(f"Pyrosmのみから{len(pyrosm_gdf)}件のデータを取得")
-            return pyrosm_gdf
-        else:
-            print("Pyrosmからはデータを取得できませんでした。")
-    
-    # 結果が空でも有効なGeoDataFrameを返す
-    if bngb_gdf.empty:
-        print("BNGBからの地名データは取得できませんでした。空のデータセットを返します。")
-        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    
-    return bngb_gdf
 
-def collect_osm_names(bbox):
-    """OpenStreetMapから水関連の地名を収集する
-    
-    Parameters
-    ----------
-    bbox : shapely.geometry.box
-        検索範囲のバウンディングボックス
-        
-    Returns
-    -------
-    gpd.GeoDataFrame
-        収集された地名データ。エラー時は空のGeoDataFrameを返す。
-    """
-    # Overpass APIのクエリ
-    overpass_url = "https://overpass-api.de/api/interpreter"
-    
-    # バウンディングボックスの座標を取得
-    south, west, north, east = bbox.bounds
-    
-    # 水関連の名前を持つノードを検索するクエリ
-    query = f"""
-    [out:json];
-    (
-      node["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
-      way["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
-      relation["name"~"(?i)igarap[eé]|igap[oó]|lagoa|baixio|porto|furo|paran[aá]"]({south},{west},{north},{east});
-    );
-    out center;
-    """
-    
-    try:
-        # APIリクエスト
-        response = requests.post(overpass_url, data={"data": query}, timeout=60)
-        response.raise_for_status()  # HTTPエラーをチェック
-        
-        # レスポンスが空でないかチェック
-        if not response.text.strip():
-            print(f"警告: Overpass APIからの空のレスポンス")
-            return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-        
-        # JSONパースを試行
-        data = response.json()
-        
-        # 結果の処理
-        records = []
-        for element in data.get("elements", []):
-            # ノードの場合
-            if element["type"] == "node":
-                lat, lon = element["lat"], element["lon"]
-            # ウェイまたはリレーションの場合（中心点を使用）
-            else:
-                lat, lon = element.get("center", {}).get("lat"), element.get("center", {}).get("lon")
-            
-            # 座標が取得できた場合のみ追加
-            if lat and lon:
-                records.append({
-                    "name": element.get("tags", {}).get("name", "Unknown"),
-                    "geometry": Point(lon, lat),
-                    "source": "osm"
-                })
-        
-        # GeoDataFrameに変換
-        if records:
-            return gpd.GeoDataFrame(records, crs="EPSG:4326")
-        else:
-            # 空のGeoDataFrameを返す
-            return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-            
-    except requests.exceptions.RequestException as e:
-        print(f"Overpass APIネットワークエラー: {e}")
-        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    except ValueError as e:  # JSON decode error
-        print(f"Overpass API JSONデコードエラー: {e}")
-        print(f"レスポンス内容: {response.text[:200]}...")  # 最初の200文字だけ表示
-        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    except Exception as e:
-        print(f"Overpass API予期しないエラー: {e}")
-        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
 
 
 def _has_water_toponym(row, pattern):
@@ -516,34 +323,3 @@ def process_toponyms(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     
     return processed
 
-def merge_toponyms(bngb_gdf: gpd.GeoDataFrame, osm_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """BNGBとOSMの地名データをマージする
-    
-    Parameters
-    ----------
-    bngb_gdf : gpd.GeoDataFrame
-        BNGBから収集された地名データ
-    osm_gdf : gpd.GeoDataFrame
-        OSMから収集された地名データ
-        
-    Returns
-    -------
-    gpd.GeoDataFrame
-        マージされた地名データ
-    """
-    # 空のDataFrameチェック
-    if bngb_gdf.empty and osm_gdf.empty:
-        return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    elif bngb_gdf.empty:
-        return osm_gdf
-    elif osm_gdf.empty:
-        return bngb_gdf
-    
-    # マージ
-    merged = pd.concat([bngb_gdf, osm_gdf], ignore_index=True)
-    
-    # GeoDataFrameに変換
-    if not isinstance(merged, gpd.GeoDataFrame):
-        merged = gpd.GeoDataFrame(merged, geometry="geometry", crs="EPSG:4326")
-    
-    return merged

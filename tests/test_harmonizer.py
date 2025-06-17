@@ -14,8 +14,7 @@ from tamagawa_to_z.harmonizer.preprocess import (
     normalize_name,
     infer_type,
     make_bbox_gdf,
-    process_toponyms,
-    merge_toponyms
+    process_toponyms
 )
 from tamagawa_to_z.harmonizer.distance import (
     classify_by_distance
@@ -103,51 +102,6 @@ def test_process_toponyms():
     assert processed["type"].iloc[1] == "lagoa"
     assert processed["type"].iloc[2] == "porto"
 
-
-def test_merge_toponyms():
-    """merge_toponyms 関数のテスト"""
-    # テスト用データの作成
-    bngb_data = {
-        "name": ["Igarapé do Paxiúba", "Lagôa Grande"],
-        "geometry": [
-            Point(-69.5, -10.5),
-            Point(-68.5, -9.5)
-        ],
-        "source": ["bngb", "bngb"]
-    }
-    bngb_gdf = gpd.GeoDataFrame(bngb_data, crs="EPSG:4326")
-    
-    osm_data = {
-        "name": ["Porto Velho", "Igarapé Pequeno"],
-        "geometry": [
-            Point(-67.5, -10.0),
-            Point(-67.0, -9.0)
-        ],
-        "source": ["osm", "osm"]
-    }
-    osm_gdf = gpd.GeoDataFrame(osm_data, crs="EPSG:4326")
-    
-    # マージ
-    merged = merge_toponyms(bngb_gdf, osm_gdf)
-    
-    # 結果の確認
-    assert isinstance(merged, gpd.GeoDataFrame)
-    assert len(merged) == 4
-    assert set(merged["source"]) == {"bngb", "osm"}
-    
-    # 空のDataFrameのテスト
-    empty_gdf = gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
-    
-    # 片方が空の場合
-    merged1 = merge_toponyms(bngb_gdf, empty_gdf)
-    assert len(merged1) == 2
-    
-    merged2 = merge_toponyms(empty_gdf, osm_gdf)
-    assert len(merged2) == 2
-    
-    # 両方が空の場合
-    merged3 = merge_toponyms(empty_gdf, empty_gdf)
-    assert len(merged3) == 0
 
 
 def test_classify_by_distance():

@@ -42,7 +42,7 @@ sys.path.append(str(PROJECT_ROOT))
 
 # 自作パッケージのインポート
 from tamagawa_to_z.harmonizer import (
-    make_bbox_gdf, collect_names, collect_osm_names, merge_toponyms, process_toponyms,
+    make_bbox_gdf, process_toponyms,
     attach_distance, water_occurrence, filter_candidates, score_candidates
 )
 
@@ -309,9 +309,10 @@ def save_results(candidates, output_path):
     # 出力ディレクトリの作成
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # parquetとして保存
-    candidates.to_parquet(output_path, index=False)
-    logger.info(f"{len(candidates)}件の候補地点を {output_path} に保存しました")
+    # CSVとして保存（より安全）
+    csv_path = output_path.replace('.parquet', '.csv')
+    candidates.to_csv(csv_path, index=False)
+    logger.info(f"{len(candidates)}件の候補地点を {csv_path} に保存しました")
 
 
 def main():
