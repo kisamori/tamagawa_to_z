@@ -31,17 +31,29 @@ def water_occurrence(gdf: gpd.GeoDataFrame,
     # 地名データのコピーを作成
     result_gdf = gdf.copy()
     
-    # ゾーン統計の計算
-    # GSWデータでは255がNODATAなので、それを除外
-    stats = zonal_stats(
-        vectors=result_gdf["geometry"],
-        raster=gsw_tif,
-        stats=["mean"],
-        nodata=255
-    )
+    # 空のGeoDataFrameの場合は処理をスキップ
+    if result_gdf.empty:
+        print("警告: 水域頻度計算の入力GeoDataFrameが空です。処理をスキップします。")
+        # 空のGeoDataFrameに'occ_pct'カラムを追加して返す
+        result_gdf["occ_pct"] = []
+        return result_gdf
     
-    # 結果の処理（NODATAの場合は0に設定）
-    result_gdf["occ_pct"] = [s["mean"] or 0 for s in stats]
+    try:
+        # ゾーン統計の計算
+        # GSWデータでは255がNODATAなので、それを除外
+        stats = zonal_stats(
+            vectors=result_gdf["geometry"],
+            raster=gsw_tif,
+            stats=["mean"],
+            nodata=255
+        )
+        
+        # 結果の処理（NODATAの場合は0に設定）
+        result_gdf["occ_pct"] = [s["mean"] or 0 for s in stats]
+    except Exception as e:
+        print(f"水域頻度計算中にエラーが発生しました: {e}")
+        # エラーが発生した場合でも処理を続行できるように'occ_pct'カラムを追加
+        result_gdf["occ_pct"] = [0] * len(result_gdf)
     
     return result_gdf
 
@@ -68,30 +80,48 @@ def buffer_occurrence(gdf: gpd.GeoDataFrame,
     # 地名データのコピーを作成
     result_gdf = gdf.copy()
     
-    # メルカトル投影に変換
-    gdf_proj = result_gdf.to_crs(3857)
+    # 空のGeoDataFrameの場合は処理をスキップ
+    if result_gdf.empty:
+        print("警告: バッファ水域頻度計算の入力GeoDataFrameが空です。処理をスキップします。")
+        # 空のGeoDataFrameに必要なカラムを追加して返す
+        result_gdf["buffer_occ_mean"] = []
+        result_gdf["buffer_occ_max"] = []
+        result_gdf["buffer_occ_min"] = []
+        result_gdf["buffer_occ_count"] = []
+        return result_gdf
     
-    # バッファの作成（メートル単位）
-    buffer_m = buffer_km * 1000
-    gdf_buffer = gdf_proj.copy()
-    gdf_buffer["geometry"] = gdf_proj.buffer(buffer_m)
-    
-    # 元の座標系に戻す
-    gdf_buffer = gdf_buffer.to_crs(4326)
-    
-    # ゾーン統計の計算
-    stats = zonal_stats(
-        vectors=gdf_buffer["geometry"],
-        raster=gsw_tif,
-        stats=["mean", "max", "min", "count"],
-        nodata=255
-    )
-    
-    # 結果の処理
-    result_gdf["buffer_occ_mean"] = [s["mean"] or 0 for s in stats]
-    result_gdf["buffer_occ_max"] = [s["max"] or 0 for s in stats]
-    result_gdf["buffer_occ_min"] = [s["min"] or 0 for s in stats]
-    result_gdf["buffer_occ_count"] = [s["count"] or 0 for s in stats]
+    try:
+        # メルカトル投影に変換
+        gdf_proj = result_gdf.to_crs(3857)
+        
+        # バッファの作成（メートル単位）
+        buffer_m = buffer_km * 1000
+        gdf_buffer = gdf_proj.copy()
+        gdf_buffer["geometry"] = gdf_proj.buffer(buffer_m)
+        
+        # 元の座標系に戻す
+        gdf_buffer = gdf_buffer.to_crs(4326)
+        
+        # ゾーン統計の計算
+        stats = zonal_stats(
+            vectors=gdf_buffer["geometry"],
+            raster=gsw_tif,
+            stats=["mean", "max", "min", "count"],
+            nodata=255
+        )
+        
+        # 結果の処理
+        result_gdf["buffer_occ_mean"] = [s["mean"] or 0 for s in stats]
+        result_gdf["buffer_occ_max"] = [s["max"] or 0 for s in stats]
+        result_gdf["buffer_occ_min"] = [s["min"] or 0 for s in stats]
+        result_gdf["buffer_occ_count"] = [s["count"] or 0 for s in stats]
+    except Exception as e:
+        print(f"バッファ水域頻度計算中にエラーが発生しました: {e}")
+        # エラーが発生した場合でも処理を続行できるように必要なカラムを追加
+        result_gdf["buffer_occ_mean"] = [0] * len(result_gdf)
+        result_gdf["buffer_occ_max"] = [0] * len(result_gdf)
+        result_gdf["buffer_occ_min"] = [0] * len(result_gdf)
+        result_gdf["buffer_occ_count"] = [0] * len(result_gdf)
     
     return result_gdf
 
@@ -148,19 +178,31 @@ def find_paleo_candidates(gdf: gpd.GeoDataFrame,
     gpd.GeoDataFrame
         古河道候補地点
     """
-    # 必要なカラムの存在確認
-    required_cols = ["dist_km", "occ_pct"]
-    for col in required_cols:
-        if col not in gdf.columns:
-            raise ValueError(f"GeoDataFrame must have a '{col}' column")
+    # 空のGeoDataFrameの場合は処理をスキップ
+    if gdf.empty:
+        print("警告: 候補地点抽出の入力GeoDataFrameが空です。空の結果を返します。")
+        # 空のGeoDataFrameをそのまま返す
+        return gdf.copy()
     
-    # 条件に基づくフィルタリング
-    # 1. 現河道から離れている（dist_km >= dist_threshold）
-    # 2. 水域頻度が低い（occ_pct < occ_threshold）
-    candidates = gdf[(gdf["dist_km"] >= dist_threshold) & 
-                     (gdf["occ_pct"] < occ_threshold)].copy()
-    
-    # 候補フラグの追加
-    candidates["is_candidate"] = True
+    try:
+        # 必要なカラムの存在確認
+        required_cols = ["dist_km", "occ_pct"]
+        for col in required_cols:
+            if col not in gdf.columns:
+                print(f"警告: 必要なカラム '{col}' がGeoDataFrameに存在しません。空の結果を返します。")
+                return gpd.GeoDataFrame([], columns=gdf.columns, crs=gdf.crs)
+        
+        # 条件に基づくフィルタリング
+        # 1. 現河道から離れている（dist_km >= dist_threshold）
+        # 2. 水域頻度が低い（occ_pct < occ_threshold）
+        candidates = gdf[(gdf["dist_km"] >= dist_threshold) & 
+                         (gdf["occ_pct"] < occ_threshold)].copy()
+        
+        # 候補フラグの追加
+        candidates["is_candidate"] = True
+    except Exception as e:
+        print(f"候補地点抽出中にエラーが発生しました: {e}")
+        # エラーが発生した場合は空のGeoDataFrameを返す
+        return gpd.GeoDataFrame([], columns=gdf.columns, crs=gdf.crs)
     
     return candidates
