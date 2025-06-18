@@ -49,8 +49,8 @@ DECIDE_SCHEMA = {
                 },
                 "lang": {
                     "type": "string",
-                    "enum": ["por", "tup", "mixed", "unknown"],
-                    "description": "言語系統（por=ポルトガル語、tup=トゥピ語系、mixed=混在、unknown=不明）"
+                    "enum": ["por", "tup", "araw", "mixed", "unknown"],
+                    "description": "言語系統（por=ポルトガル語、tup=トゥピ語系、araw=アラワク語、mixed=混在、unknown=不明）"
                 },
                 "meaning_en": {
                     "type": "string",
@@ -127,6 +127,10 @@ USER_PROMPT_TEMPLATE = """
 5. 歴史的変遷の可能性
 
 特に水関連語根（igarapé系、rio系、lagoa系等）に注目して分析してください。
+
+重要：rootフィールドについて
+- 水関連語根を文字列で返してください（例: "igarape", "lagoa", "rio"）
+- 新しい語根を発見した場合も、その語根名を文字列で返してください
 """
 
 

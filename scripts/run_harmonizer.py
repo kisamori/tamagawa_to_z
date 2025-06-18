@@ -46,6 +46,15 @@ from tamagawa_to_z.harmonizer import (
     attach_distance, water_occurrence, filter_candidates, score_candidates
 )
 from tamagawa_to_z.harmonizer.preprocess import DEFAULT_BBOX
+from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex
+
+# 環境変数読み込み
+try:
+    from dotenv import load_dotenv
+    env_path = PROJECT_ROOT / ".env"
+    load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenvが利用できない場合はスキップ
 
 
 def parse_args():
@@ -92,6 +101,14 @@ def parse_args():
         type=str,
         default=str(PROJECT_ROOT / 'data/raw/osm/norte-latest.osm.pbf'),
         help='PBFファイルのパス'
+    )
+    
+    # LLMオプション
+    parser.add_argument(
+        '--llm-sample-size',
+        type=int,
+        default=None,
+        help='LLMハーモナイゼーションのサンプルサイズ（コスト削減用）'
     )
 
     # BBOX オプション
@@ -165,11 +182,21 @@ def step2_extract_toponyms(bbox_gdf, visualize=False, use_pyrosm=False, pbf_path
     logger.info("S-2: 水場系トポニムの抽出を実行中...")
     bbox = bbox_gdf.geometry.iloc[0]
     
+    # 最新のRegexパターンを構築
+    try:
+        logger.info("=== 🔧 Water Vocabulary Regex Construction ===")
+        water_regex = build_water_regex()
+        logger.info("=== ✅ Regex Construction Completed ===")
+    except Exception as e:
+        logger.error(f"❌ roots.csvからのRegex構築に失敗: {e}")
+        logger.error("❌ 水語彙フィルタリングを実行できません。処理を中止します。")
+        raise RuntimeError(f"water_roots.csvが読み込めません: {e}")
+    
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
     try:
         from tamagawa_to_z.harmonizer.preprocess import extract_toponyms_pyrosm
-        names = extract_toponyms_pyrosm(bbox, pbf_path)
+        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex)
         if names.empty:
             logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
@@ -196,8 +223,8 @@ def step2_extract_toponyms(bbox_gdf, visualize=False, use_pyrosm=False, pbf_path
     return names
 
 
-def step3_process_toponyms(names, visualize=False):
-    """S-3: クレンジング & タイプ付け"""
+def step3_process_toponyms(names, visualize=False, llm_sample_size=None):
+    """S-3: クレンジング & タイプ付け & LLMハーモナイゼーション"""
     logger.info("S-3: クレンジング & タイプ付けを実行中...")
     
     # トポニムの処理
@@ -216,6 +243,66 @@ def step3_process_toponyms(names, visualize=False):
     # タイプ別の集計
     type_counts = names['type'].value_counts()
     logger.info(f"水系タイプ別の件数:\n{type_counts}")
+    
+    # S-3b: LLMハーモナイゼーション（既存辞書との照合・新語根発見）
+    logger.info("=== 🤖 S-3b: LLM Harmonization Starting ===")
+    try:
+        # .envファイルを再読み込み（確実に環境変数を設定）
+        try:
+            from dotenv import load_dotenv
+            env_path = PROJECT_ROOT / ".env"
+            load_dotenv(env_path)
+            logger.info(f"📁 .envファイルを再読み込みしました: {env_path}")
+        except ImportError:
+            logger.warning("python-dotenvが利用できません")
+        
+        # OpenAI APIキーの確認
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("⚠️  OpenAI APIキーが設定されていません")
+            logger.warning("📝 .env.example を .env にコピーしてAPIキーを設定してください")
+            logger.warning("🔄 LLMハーモナイゼーションをスキップして処理を続行します")
+        else:
+            logger.info(f"✅ OpenAI APIキーが設定されています (***{api_key[-4:]}) - LLMハーモナイゼーションを開始")
+            
+            # ToponymHarmonizerの初期化
+            from tamagawa_to_z.harmonizer.llm_layer.harmonize import ToponymHarmonizer
+            
+            harmonizer = ToponymHarmonizer()
+            harmonizer.prime_index()  # 既存辞書からEmbeddingインデックス構築
+            
+            # サンプルサイズの制限
+            if llm_sample_size and len(names) > llm_sample_size:
+                logger.info(f"🎯 LLMサンプルサイズ制限: {len(names)} → {llm_sample_size}件")
+                sample_names = names.sample(n=llm_sample_size, random_state=42)
+                logger.info(f"   サンプリングされた地名: {sample_names['name'].tolist()}")
+            else:
+                sample_names = names
+                logger.info(f"🎯 全{len(names)}件でLLMハーモナイゼーションを実行")
+            
+            # LLMタグ付け実行
+            tagged_names = harmonizer.attach_llm_tags(sample_names, name_column="name")
+            
+            # サンプルの場合は元データにマージ
+            if llm_sample_size and len(names) > llm_sample_size:
+                logger.info("🔄 LLM結果を元データセットにマージ中...")
+                # LLM結果のカラムを元データに追加（該当する行のみ）
+                llm_columns = [col for col in tagged_names.columns if col not in names.columns]
+                if llm_columns:
+                    names = names.merge(
+                        tagged_names[['name'] + llm_columns], 
+                        on='name', 
+                        how='left'
+                    )
+                    logger.info(f"   追加されたLLMカラム: {llm_columns}")
+            else:
+                names = tagged_names
+            
+            logger.info("=== ✅ LLM Harmonization Completed ===")
+    
+    except Exception as e:
+        logger.error(f"❌ LLMハーモナイゼーション中にエラーが発生: {e}")
+        logger.warning("🔄 LLMハーモナイゼーションをスキップして処理を続行します")
     
     # 可視化
     if visualize:
@@ -360,7 +447,7 @@ def main():
     names = step2_extract_toponyms(bbox_gdf, visualize=args.visualize, use_pyrosm=True, pbf_path=args.pbf_path)
     
     # S-3: クレンジング & タイプ付け
-    names = step3_process_toponyms(names, visualize=args.visualize)
+    names = step3_process_toponyms(names, visualize=args.visualize, llm_sample_size=args.llm_sample_size)
     
     # S-4: 現河道との距離計算
     names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize)

@@ -129,7 +129,7 @@ def append_entries(
     create_backup: bool = True
 ) -> None:
     """
-    新しいエントリーを辞書に追記する（重複除去付き）
+    新しいエントリーを辞書に追記する（canonical_name統合とcanonical_id正規化付き）
     
     Args:
         df_new: 追加するエントリーのDataFrame
@@ -152,28 +152,81 @@ def append_entries(
     if create_backup and path.exists() and not df_old.empty:
         backup_dict(path)
     
-    # データの結合と重複除去
+    # データの結合
     df_all = pd.concat([df_old, df_new], ignore_index=True)
     
-    # 重複除去（canonical_id + variant_name の組み合わせで）
-    before_count = len(df_all)
-    df_all = df_all.drop_duplicates(
-        subset=["canonical_id", "variant_name"],
+    # canonical_nameとvariant_nameの統合処理
+    df_normalized = _normalize_canonical_structure(df_all)
+    
+    # 重複除去（variant_name単独で）
+    before_count = len(df_normalized)
+    df_final = df_normalized.drop_duplicates(
+        subset=["variant_name"],
         keep="last"  # 最新のエントリーを保持
     )
-    after_count = len(df_all)
+    after_count = len(df_final)
     
-    if before_count > after_count:
-        logger.info(f"Removed {before_count - after_count} duplicate entries")
+    # 重複除去の詳細ログ
+    removed_count = before_count - after_count
+    if removed_count > 0:
+        logger.info(f"Removed {removed_count} duplicate variant entries")
     
     # 保存
     try:
-        df_all.to_csv(path, index=False)
+        df_final.to_csv(path, index=False)
         logger.info(f"Successfully appended {len(df_new)} entries to dictionary: {path}")
-        logger.info(f"Total dictionary size: {len(df_all)} entries")
+        logger.info(f"Total dictionary size: {len(df_final)} entries")
+        
+        # canonical統合の統計
+        canonical_count = len(df_final['canonical_name'].unique())
+        logger.info(f"Canonical names: {canonical_count} unique entries")
+        
     except Exception as e:
         logger.error(f"Failed to save dictionary: {e}")
         raise
+
+
+def _normalize_canonical_structure(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    canonical_nameに基づいてcanonical_idを正規化し、統合する
+    
+    Args:
+        df: 統合前のDataFrame
+        
+    Returns:
+        正規化されたDataFrame
+    """
+    if df.empty:
+        return df
+    
+    logger.debug("Normalizing canonical structure...")
+    
+    # canonical_nameでグループ化
+    canonical_groups = {}
+    canonical_id_counter = 1
+    
+    # 既存のcanonical_nameとIDのマッピングを構築
+    for _, row in df.iterrows():
+        canonical_name = row['canonical_name']
+        
+        if canonical_name not in canonical_groups:
+            # 新しいcanonical_nameに数値IDを割り当て
+            canonical_groups[canonical_name] = str(canonical_id_counter)
+            canonical_id_counter += 1
+    
+    # 各行のcanonical_idを正規化
+    df_normalized = df.copy()
+    for idx, row in df_normalized.iterrows():
+        canonical_name = row['canonical_name']
+        correct_id = canonical_groups[canonical_name]
+        df_normalized.at[idx, 'canonical_id'] = correct_id
+    
+    # グループ統計をログ出力
+    for canonical_name, canonical_id in canonical_groups.items():
+        variant_count = len(df_normalized[df_normalized['canonical_name'] == canonical_name])
+        logger.debug(f"ID {canonical_id}: '{canonical_name}' ({variant_count} variants)")
+    
+    return df_normalized
 
 
 def get_dict_stats(dict_path: Optional[pathlib.Path] = None) -> dict:

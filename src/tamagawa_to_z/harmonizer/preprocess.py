@@ -45,11 +45,7 @@ def make_bbox_gdf(
 
 # S-2: 水場系トポニムの抽出
 
-# 拡張された水語彙パターン（Pyrosm用）
-WATER_TOKENS_EXTENDED = re.compile(r'(?i)\b(' \
-    r'igarap[eé]|igap[oó]|lagoa|baixio|furo|paran[aá]|yaku|aku' \
-    r'|ygarapé|yaru|cam[aã]|charco|swamp|marsh|porto' \
-    r')\b')
+# 水語彙パターンは water_roots.csv から動的に生成されます
 
 # 除外する水域タグ
 EXCLUDE_WATER_TAGS = ["waterway", "natural", "water", "wetland", "riverbank"]
@@ -103,7 +99,7 @@ def _filter_non_water_features(gdf):
     return gdf[mask]
 
 
-def extract_toponyms_pyrosm(bbox, pbf_path=None):
+def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
     """PyrosmでローカルPBFファイルから水語彙地名を抽出する
     
     Parameters
@@ -112,6 +108,8 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None):
         検索範囲のバウンディングボックス
     pbf_path : str, optional
         PBFファイルのパス。デフォルトは data/raw/osm/norte-latest.osm.pbf
+    regex : re.Pattern, optional
+        水語彙フィルタリング用の正規表現。デフォルトはWATER_TOKENS_EXTENDED
         
     Returns
     -------
@@ -206,8 +204,12 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None):
         
         print(f"初期取得: {len(gdf)}件の地物")
         
+        # 水語彙フィルタリング用の正規表現を決定
+        if regex is None:
+            raise ValueError("水語彙Regexパターンが提供されていません。water_roots.csvから生成してください。")
+        
         # 水語彙を含む地物のフィルタリング
-        gdf = gdf[gdf.apply(lambda row: _has_water_toponym(row, WATER_TOKENS_EXTENDED), axis=1)]
+        gdf = gdf[gdf.apply(lambda row: _has_water_toponym(row, regex), axis=1)]
         print(f"水語彙フィルタ後: {len(gdf)}件")
         
         if gdf.empty:
@@ -297,6 +299,8 @@ def normalize_name(s: str) -> str:
 def infer_type(name: str) -> Optional[str]:
     """地名から水系タイプを推定する
     
+    water_roots.csvから語根を動的に読み込んで判定を行う
+    
     Parameters
     ----------
     name : str
@@ -307,9 +311,25 @@ def infer_type(name: str) -> Optional[str]:
     str or None
         推定された水系タイプ
     """
-    for kw in ["igarape", "igapo", "lagoa", "baixio", "porto", "furo", "parana"]:
-        if kw in name:
-            return kw
+    try:
+        # 相対インポートで語根読み込み機能を使用
+        from .llm_layer.root_io import load_roots
+        
+        # 水語彙語根を動的に取得
+        roots_df = load_roots()
+        root_list = roots_df["root"].dropna().tolist()
+        
+        # 各語根でマッチング確認
+        for root in root_list:
+            if root in name:
+                return root
+                
+    except Exception as e:
+        # CSVが読み込めない場合はログ出力してNoneを返す
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to load water roots for type inference: {e}")
+    
     return None
 
 def process_toponyms(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

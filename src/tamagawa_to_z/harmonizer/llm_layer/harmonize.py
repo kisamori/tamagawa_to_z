@@ -33,6 +33,7 @@ from .agent_schema import (
     create_user_prompt, 
     validate_response
 )
+from .root_io import append_roots, format_root_for_csv, validate_root_entry
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,12 @@ class ToponymHarmonizer:
         Returns:
             LLM応答結果
         """
+        logger.info(f"🤖 LLM Analysis: decide_toponym for '{raw_name}'")
+        logger.info(f"   📋 Similar candidates: {len(candidates)}")
+        if candidates:
+            for i, cand in enumerate(candidates[:3], 1):  # 上位3件のみ表示
+                logger.info(f"      {i}. {cand.get('canonical_name', 'N/A')} (similarity: {cand.get('similarity_score', 'N/A'):.3f})")
+        
         user_prompt = create_user_prompt(raw_name, candidates)
         
         messages = [
@@ -152,6 +159,8 @@ class ToponymHarmonizer:
         for attempt in range(self.max_retries):
             try:
                 start_time = time.time()
+                
+                logger.info(f"   🌐 Calling OpenAI API (attempt {attempt + 1}/{self.max_retries})...")
                 
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -167,9 +176,15 @@ class ToponymHarmonizer:
                 
                 # Tool call結果を取得
                 if response.choices[0].message.tool_calls:
-                    function_result = json.loads(
-                        response.choices[0].message.tool_calls[0].function.arguments
-                    )
+                    raw_arguments = response.choices[0].message.tool_calls[0].function.arguments
+                    logger.debug(f"   🔍 Raw LLM arguments: {raw_arguments}")
+                    
+                    try:
+                        function_result = json.loads(raw_arguments)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"   ❌ JSON parse error: {e}")
+                        logger.error(f"   📄 Raw response: {raw_arguments}")
+                        raise ValueError(f"Invalid JSON in LLM response: {e}")
                 else:
                     raise ValueError("No tool call in response")
                 
@@ -184,7 +199,16 @@ class ToponymHarmonizer:
                 # 成功統計
                 self.stats['successful_calls'] += 1
                 
-                logger.debug(f"LLM analysis for '{raw_name}': {function_result.get('relation', 'unknown')} (conf: {function_result.get('confidence', 0)})")
+                # 詳細結果ログ
+                relation = function_result.get('relation', 'unknown')
+                confidence = function_result.get('confidence', 0)
+                logger.info(f"   ✅ LLM Decision: {relation} (confidence: {confidence:.3f})")
+                
+                # root情報の表示
+                if function_result.get("root"):
+                    logger.info(f"   🔍 Root detected: {function_result['root']}")
+                
+                logger.info(f"   ⏱️  API call completed in {duration:.2f}s")
                 
                 return function_result
                     
@@ -331,6 +355,7 @@ class ToponymHarmonizer:
         
         # 結果格納用
         harmonization_results = []
+        new_root_entries = []
         
         # バッチ処理
         for i, name in enumerate(unique_names):
@@ -338,13 +363,21 @@ class ToponymHarmonizer:
                 result = self.harmonize_single(name)
                 harmonization_results.append(result)
                 
+                # 新語根発見機能は一時的に無効化（スキーマを単純化したため）
+                # 将来的には root が文字列として返された場合の新語根発見ロジックを実装
+                if isinstance(result.get("root"), dict):
+                    logger.info(f"🔍 Root object detected (simplified schema does not support this)")
+                elif result.get("root") and isinstance(result.get("root"), str):
+                    logger.info(f"🔍 Root string detected: {result['root']}")
+                
                 # 進捗ログ
                 if (i + 1) % 10 == 0:
                     logger.info(f"Processed {i + 1}/{len(unique_names)} toponyms")
                 
                 # 中間保存
                 if save_intermediate and (i + 1) % batch_size == 0:
-                    self._save_intermediate_results(harmonization_results)
+                    self._save_intermediate_results(harmonization_results, new_root_entries)
+                    new_root_entries = []  # リセット
                 
             except Exception as e:
                 logger.error(f"Failed to process '{name}': {e}")
@@ -361,6 +394,17 @@ class ToponymHarmonizer:
         logger.info("Updating toponym dictionary...")
         append_entries(results_df)
         
+        # 語根辞書に追加
+        if new_root_entries:
+            logger.info(f"📝 Adding {len(new_root_entries)} new root entries to water_roots.csv...")
+            for entry in new_root_entries:
+                logger.info(f"   Adding: {entry['root']} ({entry.get('lang', 'N/A')}) -> {entry.get('regex_token', 'N/A')}")
+            
+            roots_df = pd.DataFrame(new_root_entries)
+            append_roots(roots_df)
+            logger.info(f"   ✅ Successfully appended new roots to CSV")
+            logger.info(f"   🔄 Next run will use updated regex patterns automatically")
+        
         # 元のGeoDataFrameにマージ
         gdf_tagged = gdf.merge(
             results_df,
@@ -376,7 +420,7 @@ class ToponymHarmonizer:
         
         return gdf_tagged
     
-    def _save_intermediate_results(self, results: List[Dict[str, Any]]) -> None:
+    def _save_intermediate_results(self, results: List[Dict[str, Any]], root_entries: List[Dict[str, Any]] = None) -> None:
         """中間結果を保存"""
         if not results:
             return
@@ -384,6 +428,12 @@ class ToponymHarmonizer:
         results_df = pd.DataFrame(results)
         append_entries(results_df)
         logger.info(f"Saved intermediate results: {len(results)} entries")
+        
+        # 語根エントリーも保存
+        if root_entries:
+            roots_df = pd.DataFrame(root_entries)
+            append_roots(roots_df)
+            logger.info(f"Saved intermediate root entries: {len(root_entries)} entries")
     
     def _log_processing_stats(self) -> None:
         """処理統計情報をログ出力"""
