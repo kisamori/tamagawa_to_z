@@ -45,7 +45,7 @@ from tamagawa_to_z.harmonizer import (
     make_bbox_gdf, process_toponyms,
     attach_distance, water_occurrence, filter_candidates, score_candidates
 )
-from tamagawa_to_z.harmonizer.preprocess import ACRE_BBOX
+from tamagawa_to_z.harmonizer.preprocess import DEFAULT_BBOX
 
 
 def parse_args():
@@ -70,7 +70,7 @@ def parse_args():
     parser.add_argument(
         '--output_path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/interim/acre_candidates.parquet'),
+        default=str(PROJECT_ROOT / 'data/interim/region_candidates.parquet'),
         help='出力ファイルパス'
     )
     
@@ -100,7 +100,7 @@ def parse_args():
         type=float,
         nargs=4,
         metavar=('LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'),
-        default=list(ACRE_BBOX.bounds),
+        default=list(DEFAULT_BBOX.bounds),
         help='対象領域のBBOX (lon_min lat_min lon_max lat_max)'
     )
     
