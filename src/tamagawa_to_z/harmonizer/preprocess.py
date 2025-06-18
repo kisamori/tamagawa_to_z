@@ -103,7 +103,7 @@ def _filter_non_water_features(gdf):
     return gdf[mask]
 
 
-def extract_acre_toponyms_pyrosm(bbox, pbf_path=None):
+def extract_toponyms_pyrosm(bbox, pbf_path=None):
     """PyrosmでローカルPBFファイルから水語彙地名を抽出する
     
     Parameters

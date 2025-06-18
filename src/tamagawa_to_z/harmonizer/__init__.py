@@ -19,10 +19,13 @@ from tamagawa_to_z.harmonizer.distance import (
 )
 
 from tamagawa_to_z.harmonizer.watermask import (
-    water_occurrence,
     buffer_occurrence,
     classify_by_occurrence,
     find_paleo_candidates
+)
+
+from tamagawa_to_z.harmonizer.watermask_safe import (
+    water_occurrence_with_fallback as water_occurrence
 )
 
 from tamagawa_to_z.harmonizer.agent import (

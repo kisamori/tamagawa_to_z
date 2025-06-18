@@ -1131,6 +1131,20 @@ files = [
 ]
 
 [[package]]
+name = "gdal"
+version = "3.11.0"
+description = "GDAL: Geospatial Data Abstraction Library"
+optional = false
+python-versions = ">=3.8.0"
+groups = ["main"]
+files = [
+    {file = "gdal-3.11.0.tar.gz", hash = "sha256:ac59ccfe291d3ce4f6a9a3eed17da3777bc3bae970ce27217d4fa85db98650f8"},
+]
+
+[package.extras]
+numpy = ["numpy (>1.0.0)"]
+
+[[package]]
 name = "geographiclib"
 version = "2.0"
 description = "The geodesic routines from GeographicLib"
@@ -4225,4 +4239,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "ea24369a311af0e2e70953ab40ee03d47307ddce1e3f5972145ab9e72574cea5"
+content-hash = "6ca283e66402128162446faa3989f82667f206a5dc2117d63d14b876ba6df4f6"
