@@ -12,7 +12,7 @@ import geopandas as gpd
 from pathlib import Path
 
 # パッケージのインポート
-from tamagawa_to_z.harmonizer.preprocess import make_bbox_gdf, process_toponyms, extract_acre_toponyms_pyrosm
+from tamagawa_to_z.harmonizer.preprocess import make_bbox_gdf, process_toponyms, extract_toponyms_pyrosm
 from tamagawa_to_z.harmonizer.distance import attach_distance
 from tamagawa_to_z.harmonizer.watermask import water_occurrence
 from tamagawa_to_z.harmonizer.agent import filter_with_agent
@@ -72,7 +72,7 @@ def acre_pipeline(out, rivers, gsw, pbf, log_level):
     # S-2: 水場系トポニムの抽出
     logger.info("S-2: 水場系トポニムの抽出")
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
-    names = extract_acre_toponyms_pyrosm(bbox, pbf)
+    names = extract_toponyms_pyrosm(bbox, pbf)
     logger.info(f"ローカルPBFから{len(names)}件のトポニムを収集しました")
     
     # S-3: クレンジング & タイプ付け

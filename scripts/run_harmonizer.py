@@ -103,6 +103,13 @@ def parse_args():
         default=list(ACRE_BBOX.bounds),
         help='対象領域のBBOX (lon_min lat_min lon_max lat_max)'
     )
+    
+    # 水域頻度計算スキップオプション
+    parser.add_argument(
+        '--skip-water-freq',
+        action='store_true',
+        help='水域頻度計算をスキップする（距離のみで候補抽出）'
+    )
 
     return parser.parse_args()
 
@@ -161,8 +168,8 @@ def step2_extract_toponyms(bbox_gdf, visualize=False, use_pyrosm=False, pbf_path
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
     try:
-        from tamagawa_to_z.harmonizer.preprocess import extract_acre_toponyms_pyrosm
-        names = extract_acre_toponyms_pyrosm(bbox, pbf_path)
+        from tamagawa_to_z.harmonizer.preprocess import extract_toponyms_pyrosm
+        names = extract_toponyms_pyrosm(bbox, pbf_path)
         if names.empty:
             logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
@@ -259,20 +266,27 @@ def step4_calculate_distance(names, rivers_path, visualize=False):
     return names
 
 
-def step5_extract_candidates(names, gsw_path, visualize=False):
+def step5_extract_candidates(names, gsw_path, visualize=False, skip_water_freq=False):
     """S-5: "川が無いのに川名が残る"ポイント抽出"""
     logger.info("S-5: 候補地点抽出を実行中...")
     
-    # GSWファイルの存在確認
-    if not os.path.exists(gsw_path):
-        logger.error(f"エラー: {gsw_path} が見つかりません。")
-        logger.error("このステップはスキップします。")
-        return None
-    
-    # 水域頻度の計算
-    logger.info("水域頻度を計算しています...")
-    names = water_occurrence(names, gsw_path)
-    logger.info(f"{len(names)}件のトポニムに水域頻度情報を追加しました")
+    if skip_water_freq:
+        logger.info("水域頻度計算をスキップします（距離のみで候補抽出）")
+        # 水域頻度を0に設定
+        names = names.copy()
+        names["occ_pct"] = 0
+        logger.info(f"{len(names)}件のトポニムに仮の水域頻度情報（0%）を設定しました")
+    else:
+        # GSWファイルの存在確認
+        if not os.path.exists(gsw_path):
+            logger.error(f"エラー: {gsw_path} が見つかりません。")
+            logger.error("このステップはスキップします。")
+            return None
+        
+        # 水域頻度の計算
+        logger.info("水域頻度を計算しています...")
+        names = water_occurrence(names, gsw_path)
+        logger.info(f"{len(names)}件のトポニムに水域頻度情報を追加しました")
     
     # 結果の確認
     if logger.level <= logging.INFO and 'occ_pct' in names.columns:
@@ -352,7 +366,7 @@ def main():
     names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize)
     
     # S-5: "川が無いのに川名が残る"ポイント抽出
-    candidates = step5_extract_candidates(names, args.gsw_path, visualize=args.visualize)
+    candidates = step5_extract_candidates(names, args.gsw_path, visualize=args.visualize, skip_water_freq=args.skip_water_freq)
     
     # 結果の保存
     save_results(candidates, args.output_path)

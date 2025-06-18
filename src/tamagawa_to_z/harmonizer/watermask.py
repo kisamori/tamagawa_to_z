@@ -10,6 +10,14 @@ import numpy as np
 import geopandas as gpd
 from rasterstats import zonal_stats
 from typing import Union, Optional, List, Dict, Any
+import os
+import time
+
+# GDALのメモリ設定を最適化
+os.environ['GDAL_CACHEMAX'] = '256'  # さらに少なく（256MB）
+os.environ['GDAL_DISABLE_READDIR_ON_OPEN'] = 'EMPTY_DIR'
+os.environ['VSI_CACHE'] = 'FALSE'
+os.environ['GDAL_MAX_DATASET_POOL_SIZE'] = '50'
 
 
 def water_occurrence(gdf: gpd.GeoDataFrame, 
@@ -39,17 +47,61 @@ def water_occurrence(gdf: gpd.GeoDataFrame,
         return result_gdf
     
     try:
-        # ゾーン統計の計算
-        # GSWデータでは255がNODATAなので、それを除外
-        stats = zonal_stats(
-            vectors=result_gdf["geometry"],
-            raster=gsw_tif,
-            stats=["mean"],
-            nodata=255
-        )
+        # メモリ効率化のため、バッチ処理を実装
+        batch_size = 5  # 一度に処理するジオメトリの数を制限（さらに小さく）
+        occ_values = []
         
-        # 結果の処理（NODATAの場合は0に設定）
-        result_gdf["occ_pct"] = [s["mean"] or 0 for s in stats]
+        print(f"水域頻度計算: {len(result_gdf)}件のポイントを{batch_size}件ずつ処理中...")
+        
+        for i in range(0, len(result_gdf), batch_size):
+            batch_end = min(i + batch_size, len(result_gdf))
+            batch_gdf = result_gdf.iloc[i:batch_end]
+            
+            print(f"  バッチ {i//batch_size + 1}/{(len(result_gdf)-1)//batch_size + 1}: {i+1}-{batch_end}件目を処理中...")
+            
+            try:
+                # バッチごとにゾーン統計の計算
+                # 最も安全なアプローチ：1つずつ処理 + タイムアウト
+                batch_stats = []
+                for idx, geom in batch_gdf["geometry"].items():
+                    try:
+                        start_time = time.time()
+                        single_stat = zonal_stats(
+                            vectors=[geom],
+                            raster=gsw_tif,
+                            stats=["mean"],
+                            nodata=255,
+                            all_touched=True
+                        )
+                        end_time = time.time()
+                        
+                        # 処理時間が30秒を超えたら警告
+                        if end_time - start_time > 30:
+                            print(f"    ジオメトリ {idx} の処理時間: {end_time - start_time:.2f}秒")
+                        
+                        batch_stats.extend(single_stat)
+                        
+                    except Exception as single_e:
+                        print(f"    ジオメトリ {idx} でエラー: {single_e}")
+                        batch_stats.append({"mean": 0})
+                    
+                    # 少し待機してメモリを解放
+                    time.sleep(0.1)
+                
+                # バッチ結果を追加
+                batch_values = [s["mean"] or 0 for s in batch_stats]
+                occ_values.extend(batch_values)
+                
+            except Exception as batch_e:
+                print(f"  バッチ {i//batch_size + 1} でエラー発生: {batch_e}")
+                # エラーの場合は0で埋める
+                batch_values = [0] * len(batch_gdf)
+                occ_values.extend(batch_values)
+        
+        # 結果を設定
+        result_gdf["occ_pct"] = occ_values
+        print(f"水域頻度計算完了: {len(occ_values)}件処理")
+        
     except Exception as e:
         print(f"水域頻度計算中にエラーが発生しました: {e}")
         # エラーが発生した場合でも処理を続行できるように'occ_pct'カラムを追加
