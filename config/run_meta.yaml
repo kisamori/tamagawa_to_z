@@ -1,0 +1,10 @@
+data_source: sample_data
+notes: テストデータを使用したInspector-Validator Agentの動作確認
+parameters:
+  distance_threshold_km: 3.0
+  min_score: 0.3
+  water_occurrence_threshold: 5.0
+purpose: inspector_validator_test
+region: Acre, Brazil
+run_id: 4d7fac8c
+timestamp: '2025-06-19T11:43:55.393402'
