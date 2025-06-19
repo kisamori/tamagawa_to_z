@@ -1,0 +1,52 @@
+# Researcher Agent Configuration
+
+# Scoring weights for proposal ranking
+weights:
+  improvement: 0.6    # Weight for expected improvement metrics
+  diversity: 0.2      # Weight for approach diversity
+  cost: 0.2          # Weight for implementation cost (inverse)
+
+# Proposal generation settings
+max_proposals: 3      # Maximum number of proposals to generate
+temperature: 0.3      # LLM temperature for proposal generation
+
+# LLM configuration
+llm_model: "gpt-4"
+max_tokens: 2000
+timeout_seconds: 60
+
+# Analysis thresholds
+thresholds:
+  high_workload: 1000        # Candidates count considered high workload
+  low_recall: 0.3           # Recall@100 threshold for concern
+  low_map: 0.2              # mAP threshold for concern
+  spatial_clustering: 5      # Minimum candidates for spatial clustering concern
+
+# Root cause analysis settings
+rca:
+  max_failure_examples: 5    # Maximum examples to show per failure cluster
+  cluster_distance_threshold: 0.1  # Spatial clustering threshold (degrees)
+  
+# Code extraction settings
+code_extraction:
+  max_files_per_module: 5    # Maximum files to extract per module
+  max_snippet_size: 4096     # Maximum size per code snippet (bytes)
+
+# Default file paths for data loading
+default_paths:
+  candidates: "data/interim/region_candidates.csv"
+  toponym_dict: "data/dict/toponym_dict.csv"
+  known_sites: "data/raw/known_sites.gpkg"
+  param_yaml: "config/run_meta.yaml"
+  
+# Output formatting
+output:
+  include_confidence_scores: true
+  include_code_snippets: false     # Whether to include code in reports
+  markdown_style: "github"         # Markdown style for reports
+  
+# Notification settings (for Prefect flows)
+notifications:
+  enabled: false
+  slack_webhook: null
+  email_recipients: []
