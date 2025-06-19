@@ -82,6 +82,86 @@ DECIDE_SCHEMA = {
     }
 }
 
+# 新語根提案関数のスキーマ
+PROPOSE_ROOT_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "propose_new_water_root",
+        "description": """
+        未知の水関連語根を分析し、新しい水語彙エントリーを提案します。
+        
+        分析観点：
+        1. 語音的パターンの識別（音韻構造、音節数）
+        2. 語源分析（ポルトガル語、トゥピ語、アラワク語等の系統）
+        3. 語意推定（地形・水文特徴との関連）
+        4. 地理的分布（同一語根の地域的広がり）
+        5. 言語学的妥当性（既存語根との整合性）
+        
+        提案基準：
+        - 複数の地名で同一語根が確認される（frequency >= 2）
+        - 水関連の地形・地理的文脈で使用される
+        - 既存語根と明確に区別される音韻的特徴を持つ
+        - 言語学的に妥当な語源を持つ
+        """,
+        "parameters": {
+            "type": "object", 
+            "properties": {
+                "root": {
+                    "type": "string",
+                    "description": "提案する新語根（例: camaa, yukaru, etc.）"
+                },
+                "lang": {
+                    "type": "string",
+                    "enum": ["por", "tup", "araw", "macro-je", "mixed", "unknown"],
+                    "description": "推定言語系統"
+                },
+                "meaning_en": {
+                    "type": "string",
+                    "description": "推定意味（英語）"
+                },
+                "meaning_ja": {
+                    "type": "string",
+                    "description": "推定意味（日本語）"
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "提案確信度（0.0-1.0）"
+                },
+                "frequency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "対象データセット内での出現頻度"
+                },
+                "example_toponyms": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "この語根を含む地名例"
+                },
+                "phonetic_pattern": {
+                    "type": "string", 
+                    "description": "音韻パターン（正規表現形式）"
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": "提案理由の詳細説明（語源分析、地理的文脈、言語学的根拠等）"
+                }
+            },
+            "required": [
+                "root",
+                "lang", 
+                "meaning_en",
+                "meaning_ja",
+                "confidence",
+                "frequency",
+                "example_toponyms",
+                "reasoning"
+            ]
+        }
+    }
+}
+
 # トポニム分析システムプロンプト
 SYSTEM_PROMPT = """
 あなたはアマゾン流域の多言語トポニム（地名）解析の専門家です。
@@ -131,6 +211,35 @@ USER_PROMPT_TEMPLATE = """
 重要：rootフィールドについて
 - 水関連語根を文字列で返してください（例: "igarape", "lagoa", "rio"）
 - 新しい語根を発見した場合も、その語根名を文字列で返してください
+"""
+
+# 新語根提案用プロンプトテンプレート
+PROPOSE_ROOT_PROMPT_TEMPLATE = """
+候補語根パターン分析対象:
+
+{pattern_analysis}
+
+上記の地名パターンから、新しい水関連語根の提案を行ってください。
+
+分析データ:
+- 共通パターン: {common_pattern}
+- 出現頻度: {frequency}
+- 地名例: {example_toponyms}
+- 既存語根との比較: {existing_roots_comparison}
+
+propose_new_water_root関数を呼び出して、以下を考慮した提案を返してください：
+
+1. 音韻的一貫性: 同じ語根が複数の地名で使用されているか
+2. 地理的文脈: 水関連の地形・地物との関連性
+3. 言語系統: ポルトガル語・トゥピ語・その他言語系統の特徴
+4. 既存語根との区別: 既知の語根と明確に異なるか
+5. 語源的妥当性: 言語学的に合理的な語源を持つか
+
+重要な判定基準:
+- frequency >= 2 (複数地名で確認)
+- 水関連の地理的文脈での使用
+- 既存語根リストにない新規性
+- 音韻的に一貫したパターン
 """
 
 
@@ -185,6 +294,35 @@ def create_user_prompt(raw_name: str, candidates: List[Dict[str, Any]]) -> str:
     )
 
 
+def create_propose_root_prompt(
+    pattern_analysis: str,
+    common_pattern: str, 
+    frequency: int,
+    example_toponyms: List[str],
+    existing_roots_comparison: str
+) -> str:
+    """
+    新語根提案用のプロンプトを生成
+    
+    Args:
+        pattern_analysis: パターン分析結果
+        common_pattern: 共通パターン
+        frequency: 出現頻度
+        example_toponyms: 地名例
+        existing_roots_comparison: 既存語根との比較
+        
+    Returns:
+        新語根提案用プロンプト
+    """
+    return PROPOSE_ROOT_PROMPT_TEMPLATE.format(
+        pattern_analysis=pattern_analysis,
+        common_pattern=common_pattern,
+        frequency=frequency,
+        example_toponyms=", ".join(example_toponyms),
+        existing_roots_comparison=existing_roots_comparison
+    )
+
+
 def validate_response(response: Dict[str, Any]) -> Dict[str, str]:
     """
     OpenAI関数呼び出しレスポンスを検証
@@ -226,6 +364,57 @@ def validate_response(response: Dict[str, Any]) -> Dict[str, str]:
     return errors
 
 
+def validate_propose_root_response(response: Dict[str, Any]) -> Dict[str, str]:
+    """
+    新語根提案のOpenAI関数呼び出しレスポンスを検証
+    
+    Args:
+        response: OpenAI関数呼び出しレスポンス
+        
+    Returns:
+        エラー辞書（エラーがない場合は空辞書）
+    """
+    errors = {}
+    
+    required_fields = ["root", "lang", "meaning_en", "meaning_ja", "confidence", "frequency", "example_toponyms", "reasoning"]
+    for field in required_fields:
+        if field not in response:
+            errors[field] = f"Required field '{field}' is missing"
+    
+    # lang値の検証
+    if "lang" in response:
+        valid_langs = ["por", "tup", "araw", "macro-je", "mixed", "unknown"]
+        if response["lang"] not in valid_langs:
+            errors["lang"] = f"Invalid language: {response['lang']}. Must be one of {valid_langs}"
+    
+    # confidence値の検証
+    if "confidence" in response:
+        try:
+            conf = float(response["confidence"])
+            if not (0.0 <= conf <= 1.0):
+                errors["confidence"] = f"Confidence must be between 0.0 and 1.0, got {conf}"
+        except (ValueError, TypeError):
+            errors["confidence"] = f"Confidence must be a number, got {type(response['confidence'])}"
+    
+    # frequency値の検証
+    if "frequency" in response:
+        try:
+            freq = int(response["frequency"])
+            if freq < 1:
+                errors["frequency"] = f"Frequency must be >= 1, got {freq}"
+        except (ValueError, TypeError):
+            errors["frequency"] = f"Frequency must be an integer, got {type(response['frequency'])}"
+    
+    # example_toponyms値の検証
+    if "example_toponyms" in response:
+        if not isinstance(response["example_toponyms"], list):
+            errors["example_toponyms"] = f"example_toponyms must be a list, got {type(response['example_toponyms'])}"
+        elif len(response["example_toponyms"]) == 0:
+            errors["example_toponyms"] = "example_toponyms must not be empty"
+    
+    return errors
+
+
 # エクスポート用のスキーマ情報
 SCHEMA_INFO = {
     "function_schema": DECIDE_SCHEMA,
@@ -235,4 +424,14 @@ SCHEMA_INFO = {
     "optional_fields": ["root", "lang", "meaning_en", "meaning_ja"],
     "valid_relations": ["same", "similar", "different"],
     "valid_languages": ["por", "tup", "mixed", "unknown"]
+}
+
+# 新語根提案用のスキーマ情報
+PROPOSE_ROOT_SCHEMA_INFO = {
+    "function_schema": PROPOSE_ROOT_SCHEMA,
+    "system_prompt": SYSTEM_PROMPT,
+    "user_prompt_template": PROPOSE_ROOT_PROMPT_TEMPLATE,
+    "required_fields": ["root", "lang", "meaning_en", "meaning_ja", "confidence", "frequency", "example_toponyms", "reasoning"],
+    "optional_fields": ["phonetic_pattern"],
+    "valid_languages": ["por", "tup", "araw", "macro-je", "mixed", "unknown"]
 }

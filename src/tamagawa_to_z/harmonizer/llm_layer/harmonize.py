@@ -29,9 +29,12 @@ from .dictionary_io import load_dict, append_entries, get_dict_stats
 from .embedding import ToponymEmbedding
 from .agent_schema import (
     DECIDE_SCHEMA, 
+    PROPOSE_ROOT_SCHEMA,
     SYSTEM_PROMPT, 
-    create_user_prompt, 
-    validate_response
+    create_user_prompt,
+    create_propose_root_prompt,
+    validate_response,
+    validate_propose_root_response
 )
 from .root_io import append_roots, format_root_for_csv, validate_root_entry
 
@@ -455,3 +458,210 @@ class ToponymHarmonizer:
         stats['dictionary_stats'] = get_dict_stats()
         
         return stats
+    
+    def propose_new_root(
+        self,
+        candidate_toponyms: List[str],
+        existing_roots: Optional[List[str]] = None,
+        min_frequency: int = 2
+    ) -> Optional[Dict[str, Any]]:
+        """
+        新しい水関連語根を提案する
+        
+        Args:
+            candidate_toponyms: 候補地名のリスト
+            existing_roots: 既存語根リスト（Noneなら自動取得）
+            min_frequency: 最小出現頻度
+            
+        Returns:
+            提案された新語根情報、または提案なしの場合はNone
+        """
+        if len(candidate_toponyms) < min_frequency:
+            logger.warning(f"候補地名が最小頻度({min_frequency})を満たしません: {len(candidate_toponyms)}")
+            return None
+        
+        logger.info(f"🔍 新語根提案分析: {len(candidate_toponyms)}件の地名を解析中...")
+        
+        # 既存語根の取得
+        if existing_roots is None:
+            try:
+                from .root_io import load_water_roots
+                water_roots_df = load_water_roots()
+                existing_roots = water_roots_df['root'].tolist() if not water_roots_df.empty else []
+            except Exception as e:
+                logger.warning(f"既存語根の読み込みに失敗: {e}")
+                existing_roots = []
+        
+        # パターン分析の実行
+        pattern_analysis = self._analyze_toponym_patterns(candidate_toponyms)
+        common_pattern = self._extract_common_pattern(candidate_toponyms)
+        
+        # 既存語根との比較
+        existing_roots_comparison = self._compare_with_existing_roots(
+            common_pattern, existing_roots
+        )
+        
+        # LLM呼び出し用プロンプト作成
+        prompt = create_propose_root_prompt(
+            pattern_analysis=pattern_analysis,
+            common_pattern=common_pattern,
+            frequency=len(candidate_toponyms),
+            example_toponyms=candidate_toponyms[:5],  # 上位5件のみ
+            existing_roots_comparison=existing_roots_comparison
+        )
+        
+        # OpenAI API呼び出し
+        try:
+            response = self._call_openai_propose_root(prompt)
+            
+            # 基本的な品質チェック
+            if response.get('confidence', 0) < 0.3:
+                logger.warning(f"提案確信度が低すぎます: {response.get('confidence')}")
+                return None
+            
+            if response.get('frequency', 0) < min_frequency:
+                logger.warning(f"頻度が不足: {response.get('frequency')} < {min_frequency}")
+                return None
+            
+            logger.info(f"✅ 新語根提案成功: {response.get('root')} (confidence: {response.get('confidence'):.3f})")
+            return response
+            
+        except Exception as e:
+            logger.error(f"新語根提案で失敗: {e}")
+            return None
+    
+    def _analyze_toponym_patterns(self, toponyms: List[str]) -> str:
+        """地名パターンを分析"""
+        analysis_lines = []
+        analysis_lines.append(f"対象地名数: {len(toponyms)}")
+        analysis_lines.append(f"地名例: {', '.join(toponyms[:3])}")
+        
+        # 共通プレフィックス・サフィックス分析
+        if len(toponyms) >= 2:
+            prefixes = set()
+            suffixes = set()
+            
+            for toponym in toponyms:
+                words = toponym.lower().split()
+                if words:
+                    prefixes.add(words[0])
+                    suffixes.add(words[-1])
+            
+            common_prefixes = [p for p in prefixes if sum(1 for t in toponyms if t.lower().startswith(p)) >= 2]
+            common_suffixes = [s for s in suffixes if sum(1 for t in toponyms if t.lower().endswith(s)) >= 2]
+            
+            if common_prefixes:
+                analysis_lines.append(f"共通プレフィックス: {', '.join(common_prefixes)}")
+            if common_suffixes:
+                analysis_lines.append(f"共通サフィックス: {', '.join(common_suffixes)}")
+        
+        return "\n".join(analysis_lines)
+    
+    def _extract_common_pattern(self, toponyms: List[str]) -> str:
+        """共通パターンを抽出"""
+        if not toponyms:
+            return "パターンなし"
+        
+        # 最も頻繁に現れる単語を探す
+        word_counts = {}
+        for toponym in toponyms:
+            words = toponym.lower().split()
+            for word in words:
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # 2回以上現れる単語を頻度順にソート
+        common_words = [(word, count) for word, count in word_counts.items() if count >= 2]
+        common_words.sort(key=lambda x: x[1], reverse=True)
+        
+        if common_words:
+            return common_words[0][0]  # 最も頻度の高い単語
+        
+        return "共通パターン未検出"
+    
+    def _compare_with_existing_roots(self, pattern: str, existing_roots: List[str]) -> str:
+        """既存語根との比較"""
+        if not existing_roots:
+            return f"'{pattern}' は既存語根リストにありません（新規語根の可能性）"
+        
+        # 完全一致チェック
+        if pattern in existing_roots:
+            return f"'{pattern}' は既存語根と完全一致します"
+        
+        # 部分一致チェック
+        partial_matches = [root for root in existing_roots if pattern in root or root in pattern]
+        
+        if partial_matches:
+            return f"'{pattern}' は以下の既存語根と部分一致: {', '.join(partial_matches)}"
+        
+        return f"'{pattern}' は既存語根と一致せず（新規語根の可能性）"
+    
+    def _call_openai_propose_root(self, prompt: str) -> Dict[str, Any]:
+        """
+        新語根提案用のOpenAI Function Callingを実行
+        
+        Args:
+            prompt: 新語根提案用プロンプト
+            
+        Returns:
+            LLM応答結果
+        """
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
+        
+        for attempt in range(self.max_retries):
+            try:
+                start_time = time.time()
+                
+                logger.info(f"   🌐 Calling OpenAI API for root proposal (attempt {attempt + 1}/{self.max_retries})...")
+                
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=[PROPOSE_ROOT_SCHEMA],
+                    tool_choice={"type": "function", "function": {"name": "propose_new_water_root"}},
+                    timeout=self.timeout,
+                    temperature=0.1
+                )
+                
+                duration = time.time() - start_time
+                self.stats['api_call_duration'].append(duration)
+                
+                # Tool call結果を取得
+                if response.choices[0].message.tool_calls:
+                    raw_arguments = response.choices[0].message.tool_calls[0].function.arguments
+                    logger.debug(f"   🔍 Raw LLM arguments: {raw_arguments}")
+                    
+                    try:
+                        function_result = json.loads(raw_arguments)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"   ❌ JSON parse error: {e}")
+                        raise ValueError(f"Invalid JSON in LLM response: {e}")
+                else:
+                    raise ValueError("No tool call in response")
+                
+                # レスポンス検証
+                errors = validate_propose_root_response(function_result)
+                if errors:
+                    logger.warning(f"Validation errors in LLM response: {errors}")
+                    if any(field in errors for field in ["root", "confidence", "frequency"]):
+                        raise ValueError(f"Missing critical fields: {errors}")
+                
+                self.stats['successful_calls'] += 1
+                logger.info(f"   ⏱️  Root proposal API call completed in {duration:.2f}s")
+                
+                return function_result
+                    
+            except Exception as e:
+                logger.warning(f"OpenAI API call failed (attempt {attempt + 1}/{self.max_retries}): {e}")
+                
+                if attempt == self.max_retries - 1:
+                    self.stats['failed_calls'] += 1
+                    logger.error(f"Failed to get root proposal after {self.max_retries} attempts")
+                    raise
+                
+                wait_time = (2 ** attempt) + np.random.uniform(0, 1)
+                time.sleep(wait_time)
+        
+        raise RuntimeError("Unexpected end of retry loop")

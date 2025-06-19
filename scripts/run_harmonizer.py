@@ -57,6 +57,95 @@ except ImportError:
     pass  # python-dotenvが利用できない場合はスキップ
 
 
+def _analyze_for_new_roots(toponyms):
+    """
+    地名リストから新語根候補をパターン分析で抽出
+    
+    Args:
+        toponyms: 地名のリスト
+        
+    Returns:
+        Dict[str, List[str]]: パターン -> 地名リストの辞書
+    """
+    from collections import defaultdict
+    import re
+    
+    candidates = defaultdict(list)
+    
+    # 既知の水関連語根
+    known_water_roots = {
+        'rio', 'igarape', 'lagoa', 'porto', 'parana', 'igapo', 
+        'baixio', 'furo', 'ressaca', 'camaa', 'charco'
+    }
+    
+    # 単語ベースでのパターン分析
+    word_patterns = defaultdict(list)
+    
+    logger = logging.getLogger(__name__)
+    logger.debug(f"   🔍 地名分析開始: {toponyms}")
+    
+    for toponym in toponyms:
+        words = toponym.lower().split()
+        logger.debug(f"   🔍 地名 '{toponym}' -> 単語: {words}")
+        for word in words:
+            # 3文字以上で、水関連の可能性がある単語
+            if len(word) >= 3 and not word.isdigit():
+                logger.debug(f"     - 単語 '{word}' を分析中...")
+                
+                # 既知の水関連語根かチェック
+                is_water_related = word in known_water_roots
+                
+                # 語尾変化を考慮して語幹を抽出
+                root_candidates = []
+                
+                # そのまま
+                root_candidates.append(word)
+                
+                # 語尾のs, a, o, e除去を試行
+                for suffix in ['s', 'a', 'o', 'e']:
+                    if word.endswith(suffix) and len(word) > 3:
+                        root_candidates.append(word[:-1])
+                
+                logger.debug(f"     - 語根候補: {root_candidates} (水関連: {is_water_related})")
+                for root in root_candidates:
+                    word_patterns[root].append(toponym)
+                    logger.debug(f"       '{root}' <- '{toponym}'")
+    
+    # 1. 既知の水関連語根で2件以上の地名を持つもの
+    for pattern, names in word_patterns.items():
+        if len(names) >= 2 and pattern in known_water_roots:
+            candidates[f"known_{pattern}"] = list(set(names))  # 重複除去
+            logger.debug(f"   ✅ 既知水関連パターン '{pattern}' -> {len(candidates[f'known_{pattern}'])}件: {candidates[f'known_{pattern}']}")
+    
+    # 2. 未知の語根候補を探す（既知の水関連語根以外）
+    for pattern, names in word_patterns.items():
+        if (len(names) >= 2 and 
+            pattern not in known_water_roots and 
+            len(pattern) >= 3 and 
+            not pattern.startswith(('de', 'da', 'do', 'das', 'dos', 'rua', 'avenida', 'travessa', 'estrada'))):
+            # 既知語根ではない && 3文字以上 && 一般的な前置詞・道路名詞ではない
+            candidates[f"unknown_{pattern}"] = list(set(names))  # 重複除去
+            logger.debug(f"   🔍 未知語根候補 '{pattern}' -> {len(candidates[f'unknown_{pattern}'])}件: {candidates[f'unknown_{pattern}']}")
+    
+    # 3. 既知語根があるが新しい変形の可能性（参考情報として）
+    if not candidates and len(toponyms) >= 2:
+        # 地名タイプ別にグループ化（rio, porto等）
+        water_type_groups = defaultdict(list)
+        for toponym in toponyms:
+            words = toponym.lower().split()
+            for word in words:
+                if word in known_water_roots:
+                    water_type_groups[word].append(toponym)
+        
+        for water_type, names in water_type_groups.items():
+            if len(names) >= 2:
+                candidates[f"known_{water_type}"] = names
+                logger.debug(f"   ℹ️ 既知水関連語根 '{water_type}' -> {len(names)}件: {names} (新語根ではないが分析対象)")
+    
+    logger.debug(f"   📊 最終結果: {len(candidates)}個のパターン")
+    return dict(candidates)
+
+
 def parse_args():
     """コマンドライン引数をパースする"""
     parser = argparse.ArgumentParser(
@@ -282,6 +371,70 @@ def step3_process_toponyms(names, visualize=False, llm_sample_size=None):
             
             # LLMタグ付け実行
             tagged_names = harmonizer.attach_llm_tags(sample_names, name_column="name")
+            
+            # S-3c: 新語根発見の試行
+            logger.info("=== 🔍 S-3c: New Root Discovery Analysis ===")
+            try:
+                # 'different'判定された地名から新語根候補を抽出
+                different_toponyms = []
+                if 'relation' in tagged_names.columns:
+                    different_mask = tagged_names['relation'] == 'different'
+                    different_names = tagged_names[different_mask]['name'].dropna().tolist()
+                    
+                    if different_names:
+                        logger.info(f"🔍 'different'判定された地名: {len(different_names)}件")
+                        logger.info(f"   例: {', '.join(different_names[:3])}")
+                        
+                        # パターンが共通する地名をグループ化
+                        logger.info(f"   📊 パターン分析を実行中...")
+                        root_candidates = _analyze_for_new_roots(different_names)
+                        logger.info(f"   📊 検出されたパターン: {len(root_candidates)}個")
+                        
+                        if not root_candidates:
+                            logger.info("   ⚠️ 共通パターンが見つかりませんでした")
+                        else:
+                            logger.info(f"   📋 検出されたパターン詳細: {list(root_candidates.keys())}")
+                        
+                        llm_proposal_attempted = False
+                        for pattern, toponyms in root_candidates.items():
+                            logger.info(f"📊 パターン '{pattern}': {len(toponyms)}件 - {', '.join(toponyms[:3])}")
+                            
+                            if len(toponyms) >= 2:  # 最低2件で候補とする
+                                logger.info(f"🎯 新語根候補パターン '{pattern}': {len(toponyms)}件")
+                                
+                                # 未知語根（unknown_で始まる）の場合のみLLM提案を実行
+                                if pattern.startswith('unknown_'):
+                                    # 新語根提案を試行
+                                    logger.info(f"   🤖 LLM新語根提案を実行中...")
+                                    llm_proposal_attempted = True
+                                    proposal = harmonizer.propose_new_root(
+                                        candidate_toponyms=toponyms,
+                                        min_frequency=2
+                                    )
+                                    
+                                    if proposal:
+                                        logger.info(f"✅ 新語根提案成功: {proposal.get('root')} ({proposal.get('lang')}) - {proposal.get('meaning_ja')}")
+                                        # 実際の語根追加は今回は手動とする（自動追加は慎重に）
+                                        logger.info("   📝 語根追加は手動で検討してください")
+                                    else:
+                                        logger.info(f"❌ パターン '{pattern}' は新語根として不適切と判定")
+                                else:
+                                    logger.info(f"   ℹ️ 既知語根パターンのため、LLM提案はスキップ")
+                            else:
+                                logger.info(f"   ⚠️ パターン '{pattern}' は最低頻度(2件)を満たしません")
+                        
+                        if not llm_proposal_attempted:
+                            logger.info("🔍 新語根候補として適切なパターンが見つかりませんでした")
+                            logger.info("   - 検出されたパターンはすべて既知語根または頻度不足です")
+                    else:
+                        logger.info("'different'判定された地名がありません")
+                else:
+                    logger.info("LLM結果に'relation'カラムがありません")
+                    
+            except Exception as e:
+                logger.warning(f"新語根発見分析でエラー: {e}")
+            
+            logger.info("=== ✅ New Root Discovery Analysis Completed ===")
             
             # サンプルの場合は元データにマージ
             if llm_sample_size and len(names) > llm_sample_size:
