@@ -52,7 +52,7 @@ def cli():
 
 
 @cli.command()
-@click.option("--out", default="data/interim/acre_candidates.parquet", help="出力ファイルのパス")
+@click.option("--out", default="data/interim/region_candidates.parquet", help="出力ファイルのパス")
 @click.option("--rivers", default="data/raw/HydroRIVERS_SA.shp", help="HydroRIVERSファイルのパス")
 @click.option("--gsw", default="data/raw/GSW_occurrence.tif", help="GSW occurrenceファイルのパス")
 @click.option("--pbf", default="data/raw/osm/norte-latest.osm.pbf", help="PBFファイルのパス")

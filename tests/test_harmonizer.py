@@ -68,7 +68,7 @@ def test_make_bbox_gdf():
     bbox = gdf.geometry.iloc[0]
     assert isinstance(bbox, box)
     
-    # 境界の確認
+    # 境界の確認（デフォルトBBOX）
     bounds = bbox.bounds
     assert bounds == (-70.5, -11.5, -66.5, -8.5)
 

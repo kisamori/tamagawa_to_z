@@ -33,6 +33,18 @@ from tamagawa_to_z.harmonizer.agent import (
     score_candidates
 )
 
+# LLMレイヤーのインポート（条件付き）
+try:
+    from tamagawa_to_z.harmonizer.llm_layer import (
+        ToponymHarmonizer,
+        ToponymEmbedding,
+        load_dict,
+        append_entries
+    )
+    _has_llm_layer = True
+except ImportError:
+    _has_llm_layer = False
+
 # メインクラスのインポート（条件付き）
 try:
     from tamagawa_to_z.harmonizer.harmonizer import Harmonizer
@@ -63,6 +75,15 @@ __all__ = [
     'filter_candidates',
     'score_candidates'
 ]
+
+# LLMレイヤーが利用可能な場合は__all__に追加
+if _has_llm_layer:
+    __all__.extend([
+        'ToponymHarmonizer',
+        'ToponymEmbedding', 
+        'load_dict',
+        'append_entries'
+    ])
 
 # Harmonizerクラスが利用可能な場合は__all__に追加
 if _has_harmonizer:
