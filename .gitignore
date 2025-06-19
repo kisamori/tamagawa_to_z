@@ -86,6 +86,7 @@ Thumbs.db
 /data/raw/
 /data/interim/
 /data/dict/
+/data/output/
 /models/
 /output/
 /logs/
