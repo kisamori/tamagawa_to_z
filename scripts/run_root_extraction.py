@@ -219,10 +219,74 @@ def parse_args():
         help='新語根の自動マージを無効化する'
     )
     
+    # OSMキー設定オプション
+    parser.add_argument(
+        '--osm-keys-config',
+        type=str,
+        default=str(PROJECT_ROOT / 'data/config/osm_keys.yaml'),
+        help='OSMキー設定ファイルのパス'
+    )
+    parser.add_argument(
+        '--osm-keys-mode',
+        type=str,
+        choices=['conservative', 'standard', 'extended', 'water_focused'],
+        default='standard',
+        help='OSMキー抽出モード (conservative/standard/extended/water_focused)'
+    )
+    
     return parser.parse_args()
 
 
-def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None, include_water_features=False):
+def load_osm_keys_config(config_path, mode='standard'):
+    """
+    OSMキー設定ファイルを読み込み、指定されたモードのキーリストを返す
+    
+    Args:
+        config_path: 設定ファイルのパス
+        mode: 抽出モード ('conservative', 'standard', 'extended', 'water_focused')
+        
+    Returns:
+        List[str]: OSMキーのリスト
+    """
+    try:
+        import yaml
+        
+        config_path = Path(config_path)
+        if not config_path.exists():
+            logger.warning(f"OSMキー設定ファイルが見つかりません: {config_path}")
+            logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+            return ['place', 'landuse', 'man_made', 'highway']
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        # 指定されたモードのキーを取得
+        if 'extraction_modes' in config and mode in config['extraction_modes']:
+            osm_keys = config['extraction_modes'][mode]
+            logger.info(f"OSMキー設定モード '{mode}': {osm_keys}")
+            return osm_keys
+        else:
+            logger.warning(f"指定されたモード '{mode}' が設定ファイルに見つかりません")
+            # フォールバック: default_keysを使用
+            if 'default_keys' in config:
+                osm_keys = config['default_keys']
+                logger.info(f"default_keysを使用: {osm_keys}")
+                return osm_keys
+            else:
+                logger.info("ハードコードされたデフォルトを使用: ['place', 'landuse', 'man_made', 'highway']")
+                return ['place', 'landuse', 'man_made', 'highway']
+                
+    except ImportError:
+        logger.error("PyYAMLがインストールされていません。pip install pyyaml を実行してください。")
+        logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+        return ['place', 'landuse', 'man_made', 'highway']
+    except Exception as e:
+        logger.error(f"OSMキー設定ファイルの読み込みエラー: {e}")
+        logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+        return ['place', 'landuse', 'man_made', 'highway']
+
+
+def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None, include_water_features=False, osm_keys=None):
     """地名収集"""
     logger.info("=== 🌍 地名収集フェーズ開始 ===")
     
@@ -243,8 +307,10 @@ def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None, in
     
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
+    if osm_keys:
+        logger.info(f"OSMキー: {osm_keys}")
     try:
-        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex, include_water_features=include_water_features)
+        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex, include_water_features=include_water_features, osm_keys=osm_keys)
         if names.empty:
             logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
@@ -634,8 +700,11 @@ def main():
         viz_output_dir = Path(args.viz_output_dir) / f"root_extraction_{timestamp}"
         logger.info(f"📁 可視化出力ディレクトリ: {viz_output_dir}")
     
+    # OSMキー設定の読み込み
+    osm_keys = load_osm_keys_config(args.osm_keys_config, args.osm_keys_mode)
+    
     # フェーズ1: 地名収集
-    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir, include_water_features=args.include_water_features)
+    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir, include_water_features=args.include_water_features, osm_keys=osm_keys)
     if names is None or len(names) == 0:
         logger.error("地名収集に失敗しました。処理を終了します。")
         return
