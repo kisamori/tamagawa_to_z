@@ -205,7 +205,7 @@ def parse_args():
     parser.add_argument(
         '--output_path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/interim/site_candidates.csv'),
+        default=str(PROJECT_ROOT / 'data/output/candidates/site_candidates.csv'),
         help='サイト特定結果の出力ファイルパス'
     )
     parser.add_argument(

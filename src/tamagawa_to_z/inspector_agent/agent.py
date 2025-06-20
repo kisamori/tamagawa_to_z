@@ -43,7 +43,7 @@ class InspectorValidatorAgent:
         """OpenAI Assistant を作成する"""
         self.assistant = self.client.beta.assistants.create(
             name="InspectorValidator",
-            model="gpt-4o-mini",
+            model="gpt-4o",
             instructions="""あなたは多言語トポニム解析システムのInspector-Validator Agentです。
 
 あなたの役割：

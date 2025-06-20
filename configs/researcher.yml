@@ -11,7 +11,7 @@ max_proposals: 3      # Maximum number of proposals to generate
 temperature: 0.3      # LLM temperature for proposal generation
 
 # LLM configuration
-llm_model: "gpt-4"
+llm_model: "gpt-4o"
 max_tokens: 2000
 timeout_seconds: 60
 

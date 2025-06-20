@@ -136,7 +136,7 @@ Respond in this JSON format:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert in geospatial parameter optimization for archaeological site detection."},
                     {"role": "user", "content": prompt}
@@ -215,7 +215,7 @@ Respond in this JSON format:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert in NLP pipeline optimization and prompt engineering."},
                     {"role": "user", "content": prompt}

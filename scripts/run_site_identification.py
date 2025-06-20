@@ -27,6 +27,7 @@ import os
 import sys
 import argparse
 import logging
+import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -101,7 +102,7 @@ def parse_args():
     parser.add_argument(
         '--output-path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/interim/paleochannel_candidates.csv'),
+        default=str(PROJECT_ROOT / 'data/output/candidates/paleochannel_candidates.csv'),
         help='出力ファイルパス'
     )
     
@@ -475,6 +476,17 @@ def step5_extract_candidates(names, gsw_path, visualize=False, skip_water_freq=F
         return None
 
 
+def backup_existing_file(output_path):
+    """既存ファイルのバックアップを作成"""
+    if os.path.exists(output_path):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{output_path}.backup_{timestamp}"
+        shutil.copy2(output_path, backup_path)
+        logger.info(f"既存ファイルをバックアップしました: {backup_path}")
+        return backup_path
+    return None
+
+
 def save_results(candidates, output_path):
     """結果の保存"""
     if candidates is None or len(candidates) == 0:
@@ -483,6 +495,9 @@ def save_results(candidates, output_path):
     
     # 出力ディレクトリの作成
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # 既存ファイルのバックアップ
+    backup_path = backup_existing_file(output_path)
     
     # CSVとして保存
     candidates.to_csv(output_path, index=False)
