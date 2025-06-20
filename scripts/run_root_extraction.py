@@ -439,8 +439,12 @@ def harmonize_toponyms(names, sample_size=None, visualize=False, output_dir=None
                 sample_names = names
                 logger.info(f"🎯 全{len(names)}件でLLMハーモナイゼーションを実行")
             
-            # LLMタグ付け実行
-            tagged_names = harmonizer.attach_llm_tags(sample_names, name_column="name")
+            # LLMタグ付け実行（候補地名を類似度検索対象に含める）
+            tagged_names = harmonizer.attach_llm_tags(
+                sample_names, 
+                name_column="name",
+                include_candidates=True  # 候補地名を類似度検索対象に含める
+            )
             
             # 新語根発見の試行
             logger.info("=== 🔍 新語根発見分析開始 ===")
