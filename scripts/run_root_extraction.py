@@ -205,10 +205,17 @@ def parse_args():
         help='可視化画像の出力ディレクトリ'
     )
     
+    # 水域タグ除外ルール無効化オプション
+    parser.add_argument(
+        '--include-water-features',
+        action='store_true',
+        help='水域タグを持つ地物も地名候補として含める（デフォルトは除外）'
+    )
+    
     return parser.parse_args()
 
 
-def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None):
+def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None, include_water_features=False):
     """地名収集"""
     logger.info("=== 🌍 地名収集フェーズ開始 ===")
     
@@ -230,7 +237,7 @@ def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None):
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
     try:
-        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex)
+        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex, include_water_features=include_water_features)
         if names.empty:
             logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
@@ -537,7 +544,7 @@ def main():
         logger.info(f"📁 可視化出力ディレクトリ: {viz_output_dir}")
     
     # フェーズ1: 地名収集
-    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir)
+    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir, include_water_features=args.include_water_features)
     if names is None or len(names) == 0:
         logger.error("地名収集に失敗しました。処理を終了します。")
         return

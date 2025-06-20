@@ -84,6 +84,9 @@ def run_root_extraction_script(args_dict):
     if args_dict.get('root_output_path'):
         cmd.extend(['--output-dir', args_dict['root_output_path']])
     
+    if args_dict.get('include_water_features'):
+        cmd.append('--include-water-features')
+    
     logger.info(f"辞書管理スクリプトを実行中: {' '.join(cmd)}")
     
     try:
@@ -273,6 +276,13 @@ def parse_args():
         default=20.0,
         help='水域頻度閾値（%）'
     )
+    
+    # 水域タグ除外ルール無効化オプション
+    parser.add_argument(
+        '--include-water-features',
+        action='store_true',
+        help='水域タグを持つ地物も地名候補として含める（デフォルトは除外）'
+    )
 
     return parser.parse_args()
 
@@ -298,7 +308,8 @@ def main():
         'visualize': args.visualize,
         'skip_water_freq': args.skip_water_freq,
         'distance_threshold': args.distance_threshold,
-        'water_freq_threshold': args.water_freq_threshold
+        'water_freq_threshold': args.water_freq_threshold,
+        'include_water_features': args.include_water_features
     }
     
     success = True

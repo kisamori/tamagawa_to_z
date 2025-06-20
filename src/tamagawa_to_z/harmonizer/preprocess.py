@@ -99,7 +99,7 @@ def _filter_non_water_features(gdf):
     return gdf[mask]
 
 
-def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
+def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None, include_water_features=False):
     """PyrosmでローカルPBFファイルから水語彙地名を抽出する
     
     Parameters
@@ -110,6 +110,8 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
         PBFファイルのパス。デフォルトは data/raw/osm/norte-latest.osm.pbf
     regex : re.Pattern, optional
         水語彙フィルタリング用の正規表現。デフォルトはWATER_TOKENS_EXTENDED
+    include_water_features : bool, optional
+        水域タグを持つ地物も含めるかどうか。デフォルトはFalse（除外）
         
     Returns
     -------
@@ -216,13 +218,16 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
             print("水語彙を含む地物が見つかりません。")
             return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
         
-        # 水域タグを持つ地物を除外
-        gdf = _filter_non_water_features(gdf)
-        print(f"非水域フィルタ後: {len(gdf)}件")
-        
-        if gdf.empty:
-            print("水域以外の地物が見つかりません。")
-            return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+        # 水域タグを持つ地物を除外（オプション）
+        if not include_water_features:
+            gdf = _filter_non_water_features(gdf)
+            print(f"非水域フィルタ後: {len(gdf)}件")
+            
+            if gdf.empty:
+                print("水域以外の地物が見つかりません。")
+                return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+        else:
+            print(f"水域タグ除外をスキップ: {len(gdf)}件")
         
         # 結果の整理
         records = []

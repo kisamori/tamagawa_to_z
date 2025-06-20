@@ -72,6 +72,13 @@ python scripts/run_site_identification.py --rivers-path data/raw/HydroRIVERS_v10
 - `--visualize`: 処理結果を可視化する（OpenStreetMap背景付き画像ファイルとして保存）
 - `--viz-output-dir PATH`: 可視化画像の出力ディレクトリ（デフォルト: `data/plots`）
 
+### データフィルタリング設定
+- `--include-water-features`: 水域タグを持つ地物も地名候補として含める（デフォルトは除外）
+  
+  **詳細**: デフォルトでは、OSMの水域タグ（`waterway`, `natural=water`, `water`, `wetland`, `riverbank`）を持つ地物は地名候補から除外されます。このオプションを指定すると、これらのタグを持つ地物も地名候補に含まれます。
+  
+  **注意**: 現在の対象地域（アマゾン北部）のOSMデータでは、水域タグを持つ名前付き地物が存在しないため、このオプションの有無による抽出数の変化は見られません。将来的に異なる地域やデータセットを使用する際に有効になる可能性があります。
+
 ### データファイル設定
 - `--rivers-path PATH`: HydroRIVERSシェープファイルパス（デフォルト: `data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp`）
 - `--gsw-path PATH`: GSW occurrenceのTIFFファイルパス（デフォルト: `data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif`）
@@ -165,12 +172,18 @@ python scripts/run_root_extraction.py --sample-size 20
 
 # 遺跡候補地特定のみ、水域頻度計算スキップ
 python scripts/run_site_identification.py --skip-water-freq
+
+# 水域タグを持つ地物も含めて地名抽出
+python scripts/run_root_extraction.py --include-water-features --sample-size 20
 ```
 
 ### 本格実行
 ```bash
 # 辞書管理＋遺跡候補地特定の統合実行
 python scripts/run_harmonizer.py --mode both --sample-size 200 --visualize
+
+# 水域タグを持つ地物も含めて統合実行
+python scripts/run_harmonizer.py --mode both --include-water-features --sample-size 200 --visualize
 ```
 
 ### ログ出力
