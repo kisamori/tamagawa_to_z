@@ -529,7 +529,8 @@ def merge_new_roots_to_water_dict(new_root_analysis):
                 'lang': proposal.get('lang'),
                 'regex_token': proposal.get('root'),  # 簡単なパターンとしてrootをそのまま使用
                 'meaning_en': proposal.get('meaning_en'),
-                'meaning_ja': proposal.get('meaning_ja')
+                'meaning_ja': proposal.get('meaning_ja'),
+                'weight': proposal.get('confidence', 0.5)  # confidenceをweightとして使用、デフォルトは0.5
             }
             new_roots_data.append(new_root)
     
