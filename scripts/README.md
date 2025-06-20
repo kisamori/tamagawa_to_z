@@ -72,14 +72,68 @@ python scripts/run_site_identification.py --rivers-path data/raw/HydroRIVERS_v10
 - `--visualize`: 処理結果を可視化する（OpenStreetMap背景付き画像ファイルとして保存）
 - `--viz-output-dir PATH`: 可視化画像の出力ディレクトリ（デフォルト: `data/plots`）
 
+### データフィルタリング設定
+- `--include-water-features`: 水域タグを持つ地物も地名候補として含める（デフォルトは除外）
+  
+  **詳細**: デフォルトでは、OSMの水域タグ（`waterway`, `natural=water`, `water`, `wetland`, `riverbank`）を持つ地物は地名候補から除外されます。このオプションを指定すると、これらのタグを持つ地物も地名候補に含まれます。
+  
+  **注意**: 現在の対象地域（アマゾン北部）のOSMデータでは、水域タグを持つ名前付き地物が存在しないため、このオプションの有無による抽出数の変化は見られません。将来的に異なる地域やデータセットを使用する際に有効になる可能性があります。
+
 ### データファイル設定
 - `--rivers-path PATH`: HydroRIVERSシェープファイルパス（デフォルト: `data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp`）
 - `--gsw-path PATH`: GSW occurrenceのTIFFファイルパス（デフォルト: `data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif`）
 
 ## 辞書・語根管理専用オプション（run_root_extraction.py）
 
+### LLM・処理設定
 - `--sample-size N`: LLMハーモナイゼーションのサンプルサイズ（コスト削減用）
 - `--output-dir PATH`: 出力ディレクトリ（デフォルト: `data/interim`）
+- `--no-merge-roots`: 新語根の自動マージを無効化する
+
+### OSMキー設定（地名抽出範囲の制御）
+- `--osm-keys-config PATH`: OSMキー設定ファイルのパス（デフォルト: `data/config/osm_keys.yaml`）
+- `--osm-keys-mode MODE`: OSMキー抽出モード（デフォルト: `standard`）
+
+**利用可能なOSMキー抽出モード:**
+- `conservative`: 最小限のキー（place, natural, historic）
+- `standard`: 標準設定（place, landuse, man_made, highway）
+- `extended`: 包括的抽出（上記＋amenity, tourism, leisure, shop, natural, waterway, railway, historic, office, building）
+- `water_focused`: 水関連地名特化（place, natural, waterway, man_made, historic, landuse）
+
+**OSMキー設定ファイル（osm_keys.yaml）について:**
+
+設定ファイル `data/config/osm_keys.yaml` では、OpenStreetMapから地名を抽出する際に使用するキー（データカテゴリ）を制御できます：
+
+```yaml
+# 抽出モードごとの設定
+extraction_modes:
+  standard:           # デフォルト設定
+    - place           # 村、集落、都市など
+    - landuse         # 土地利用エリア
+    - man_made        # 人工構造物
+    - highway         # 道路・交通インフラ
+  
+  extended:           # より包括的な抽出
+    - place
+    - landuse
+    - man_made
+    - highway
+    - amenity         # 施設・サービス（銀行、レストラン、学校、病院）
+    - tourism         # 観光施設（ホテル、博物館、観光地）
+    - leisure         # レクリエーション施設（公園、スポーツセンター）
+    - shop            # 商業施設（店舗、市場）
+    - natural         # 自然地形（山、丘、洞窟、海岸）
+    - waterway        # 水路関連（川、運河、水路）※水関連地名に特に有用
+    - railway         # 鉄道インフラ（駅、路線、プラットフォーム）
+    - historic        # 歴史的建造物（遺跡、記念碑、考古学的遺跡）
+    - office          # オフィス・行政施設（政府、企業）
+    - building        # 名前付き建物・構造物
+```
+
+**注意事項:**
+- より多くのキーを使用すると包括的な抽出が可能ですが、処理時間が増加し、ノイズも増える可能性があります
+- 水語彙フィルタリングは初期抽出後に適用されるため、抽出されるのは水関連語彙を含む地名のみです
+- 各OSM地物は name, alt_name, old_name, loc_name フィールドのいずれかを持つ必要があります
 
 **出力ファイル:**
 - `toponym_harmonization_results.csv`: ハーモナイゼーション済み地名辞書
@@ -165,12 +219,30 @@ python scripts/run_root_extraction.py --sample-size 20
 
 # 遺跡候補地特定のみ、水域頻度計算スキップ
 python scripts/run_site_identification.py --skip-water-freq
+
+# 水域タグを持つ地物も含めて地名抽出
+python scripts/run_root_extraction.py --include-water-features --sample-size 20
+
+# 保守的モードで最小限のキーを使用
+python scripts/run_root_extraction.py --osm-keys-mode conservative --sample-size 20
+
+# 水関連地名特化モードを使用
+python scripts/run_root_extraction.py --osm-keys-mode water_focused --sample-size 20
 ```
 
 ### 本格実行
 ```bash
 # 辞書管理＋遺跡候補地特定の統合実行
 python scripts/run_harmonizer.py --mode both --sample-size 200 --visualize
+
+# 水域タグを持つ地物も含めて統合実行
+python scripts/run_harmonizer.py --mode both --include-water-features --sample-size 200 --visualize
+
+# 包括的抽出モードで辞書管理を実行
+python scripts/run_root_extraction.py --osm-keys-mode extended --sample-size 100 --visualize
+
+# カスタムOSMキー設定ファイルを使用
+python scripts/run_root_extraction.py --osm-keys-config custom_osm_keys.yaml --sample-size 100
 ```
 
 ### ログ出力

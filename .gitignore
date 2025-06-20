@@ -83,7 +83,7 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-/data/*
+/data/
 /models/
 /output/
 /logs/

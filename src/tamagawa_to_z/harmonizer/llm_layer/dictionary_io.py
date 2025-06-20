@@ -22,6 +22,7 @@ COLUMNS = [
     "canonical_id",
     "canonical_name", 
     "variant_name",
+    "variant_id",
     "root",
     "lang",
     "meaning_en",
@@ -29,7 +30,7 @@ COLUMNS = [
     "confidence"
 ]
 
-# 必須列
+# 必須列（variant_idは自動生成されるため除外）
 REQUIRED_COLUMNS = ["canonical_id", "canonical_name", "variant_name", "confidence"]
 
 
@@ -158,7 +159,7 @@ def append_entries(
     # canonical_nameとvariant_nameの統合処理
     df_normalized = _normalize_canonical_structure(df_all)
     
-    # 重複除去（variant_name単独で）
+    # 重複除去（variant_name単独で、variant_idは固有なので重複はないはず）
     before_count = len(df_normalized)
     df_final = df_normalized.drop_duplicates(
         subset=["variant_name"],
@@ -179,7 +180,9 @@ def append_entries(
         
         # canonical統合の統計
         canonical_count = len(df_final['canonical_name'].unique())
+        variant_count = len(df_final['variant_name'].unique())
         logger.info(f"Canonical names: {canonical_count} unique entries")
+        logger.info(f"Variant names: {variant_count} unique entries")
         
     except Exception as e:
         logger.error(f"Failed to save dictionary: {e}")
@@ -188,7 +191,7 @@ def append_entries(
 
 def _normalize_canonical_structure(df: pd.DataFrame) -> pd.DataFrame:
     """
-    canonical_nameに基づいてcanonical_idを正規化し、統合する
+    canonical_nameに基づいてcanonical_idを正規化し、variant_nameに基づいてvariant_idを割り当てる
     
     Args:
         df: 統合前のDataFrame
@@ -214,17 +217,41 @@ def _normalize_canonical_structure(df: pd.DataFrame) -> pd.DataFrame:
             canonical_groups[canonical_name] = str(canonical_id_counter)
             canonical_id_counter += 1
     
-    # 各行のcanonical_idを正規化
+    # variant_id列が存在しない場合は追加
+    if 'variant_id' not in df.columns:
+        df['variant_id'] = ''
+    
+    # variant_nameでユニークなvariant_idを割り当て
+    variant_groups = {}
+    variant_id_counter = 1
+    
+    # 既存のvariant_nameとIDのマッピングを構築
+    for _, row in df.iterrows():
+        variant_name = row['variant_name']
+        
+        if variant_name not in variant_groups:
+            # 新しいvariant_nameに数値IDを割り当て
+            variant_groups[variant_name] = str(variant_id_counter)
+            variant_id_counter += 1
+    
+    # 各行のcanonical_idとvariant_idを正規化
     df_normalized = df.copy()
     for idx, row in df_normalized.iterrows():
         canonical_name = row['canonical_name']
-        correct_id = canonical_groups[canonical_name]
-        df_normalized.at[idx, 'canonical_id'] = correct_id
+        variant_name = row['variant_name']
+        
+        correct_canonical_id = canonical_groups[canonical_name]
+        correct_variant_id = variant_groups[variant_name]
+        
+        df_normalized.at[idx, 'canonical_id'] = correct_canonical_id
+        df_normalized.at[idx, 'variant_id'] = correct_variant_id
     
     # グループ統計をログ出力
     for canonical_name, canonical_id in canonical_groups.items():
         variant_count = len(df_normalized[df_normalized['canonical_name'] == canonical_name])
-        logger.debug(f"ID {canonical_id}: '{canonical_name}' ({variant_count} variants)")
+        logger.debug(f"Canonical ID {canonical_id}: '{canonical_name}' ({variant_count} variants)")
+    
+    logger.debug(f"Assigned {len(variant_groups)} unique variant IDs")
     
     return df_normalized
 
@@ -291,3 +318,73 @@ def search_variants(
         )
     
     return df[mask]
+
+
+def migrate_add_variant_id(dict_path: Optional[pathlib.Path] = None, create_backup: bool = True) -> bool:
+    """
+    既存の辞書にvariant_id列を追加するマイグレーション
+    
+    Args:
+        dict_path: 辞書ファイルパス
+        create_backup: バックアップを作成するかどうか
+        
+    Returns:
+        bool: マイグレーション成功の可否
+    """
+    path = dict_path or DICT_PATH
+    
+    if not path.exists():
+        logger.info(f"Dictionary file not found: {path}")
+        return False
+    
+    # 現在の辞書を読み込み
+    df = pd.read_csv(path, dtype=str)
+    
+    # variant_id列が既に存在する場合はスキップ
+    if 'variant_id' in df.columns:
+        logger.info("variant_id column already exists. Migration skipped.")
+        return True
+    
+    logger.info(f"Starting migration: adding variant_id column to {path}")
+    
+    # バックアップ作成
+    if create_backup:
+        backup_dict(path)
+    
+    # variant_id列を追加
+    df['variant_id'] = ''
+    
+    # variant_nameに基づいて固有IDを割り当て
+    variant_groups = {}
+    variant_id_counter = 1
+    
+    for idx, row in df.iterrows():
+        variant_name = row['variant_name']
+        
+        if variant_name not in variant_groups:
+            variant_groups[variant_name] = str(variant_id_counter)
+            variant_id_counter += 1
+        
+        df.at[idx, 'variant_id'] = variant_groups[variant_name]
+    
+    # 列の順序を調整（variant_idをvariant_nameの後に配置）
+    columns_order = []
+    for col in COLUMNS:
+        if col in df.columns:
+            columns_order.append(col)
+    
+    # 残りの列を追加（relation, reasoning等）
+    for col in df.columns:
+        if col not in columns_order:
+            columns_order.append(col)
+    
+    df = df[columns_order]
+    
+    # 保存
+    try:
+        df.to_csv(path, index=False)
+        logger.info(f"Migration completed successfully. Added {len(variant_groups)} unique variant IDs.")
+        return True
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        return False

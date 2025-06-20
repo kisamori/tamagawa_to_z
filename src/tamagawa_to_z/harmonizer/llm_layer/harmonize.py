@@ -49,7 +49,7 @@ class ToponymHarmonizer:
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4o",
         embedding_model: str = "sentence-transformers/distiluse-base-multilingual-cased-v2",
         max_retries: int = 3,
         timeout: float = 30.0,
@@ -333,7 +333,8 @@ class ToponymHarmonizer:
         gdf: pd.DataFrame,
         name_column: str = "name",
         batch_size: int = 10,
-        save_intermediate: bool = True
+        save_intermediate: bool = True,
+        include_candidates: bool = True
     ) -> pd.DataFrame:
         """
         GeoDataFrameにLLMタグを付与し、辞書を更新する
@@ -343,6 +344,7 @@ class ToponymHarmonizer:
             name_column: 地名列の名前
             batch_size: バッチサイズ（中間保存用）
             save_intermediate: 中間結果を保存するかどうか
+            include_candidates: 候補地名を類似度検索対象に含めるかどうか
             
         Returns:
             LLMタグ付きGeoDataFrame
@@ -354,7 +356,14 @@ class ToponymHarmonizer:
         
         # 一意な地名を取得
         unique_names = gdf[name_column].dropna().unique()
-        logger.info(f"Processing {len(unique_names)} unique toponyms")
+        logger.info(f"🔍 LLM同一判定の進捗: {len(unique_names)}件の候補があります")
+        
+        # 候補地名を類似度検索対象に含める
+        if include_candidates:
+            logger.info("🔧 候補地名を類似度検索インデックスに追加中...")
+            candidate_names = unique_names.tolist()
+            self.embedding.add_candidates_to_index(candidate_names)
+            logger.info("✅ 候補地名をインデックスに追加完了")
         
         # 結果格納用
         harmonization_results = []
@@ -363,6 +372,7 @@ class ToponymHarmonizer:
         # バッチ処理
         for i, name in enumerate(unique_names):
             try:
+                logger.info(f"🔍 LLM同一判定の進捗: {i + 1}/{len(unique_names)}件進行中 - 処理中: '{name}'")
                 result = self.harmonize_single(name)
                 harmonization_results.append(result)
                 
@@ -373,9 +383,9 @@ class ToponymHarmonizer:
                 elif result.get("root") and isinstance(result.get("root"), str):
                     logger.info(f"🔍 Root string detected: {result['root']}")
                 
-                # 進捗ログ
+                # 進捗ログ (10件ごと)
                 if (i + 1) % 10 == 0:
-                    logger.info(f"Processed {i + 1}/{len(unique_names)} toponyms")
+                    logger.info(f"🔍 LLM同一判定の進捗: {i + 1}/{len(unique_names)}件完了")
                 
                 # 中間保存
                 if save_intermediate and (i + 1) % batch_size == 0:
@@ -429,6 +439,11 @@ class ToponymHarmonizer:
             return
         
         results_df = pd.DataFrame(results)
+        
+        # variant_id列が必要な場合は追加（新規エントリー用のダミーID）
+        if 'variant_id' not in results_df.columns:
+            results_df['variant_id'] = ''  # 空文字、append_entriesで正しいIDが割り当てられる
+        
         append_entries(results_df)
         logger.info(f"Saved intermediate results: {len(results)} entries")
         

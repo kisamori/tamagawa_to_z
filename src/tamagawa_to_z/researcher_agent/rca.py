@@ -263,7 +263,7 @@ class RootCauseAnalyzer:
             
             # Call LLM
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": self._get_system_prompt()},
                     {"role": "user", "content": prompt}

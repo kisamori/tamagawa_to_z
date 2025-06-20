@@ -25,6 +25,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # プロジェクトルートをPythonパスに追加
 project_root = Path(__file__).parent.parent
@@ -50,8 +51,8 @@ def parse_arguments():
     
     parser.add_argument(
         "--output",
-        required=True,
-        help="研究レポートと計画の出力ディレクトリ"
+        default="data/output/research_reports",
+        help="研究レポートと計画の出力ディレクトリ（デフォルト: data/output/research_reports）"
     )
     
     # オプション引数
@@ -135,11 +136,16 @@ def main():
     # 最新のIA出力ディレクトリを解決
     artefacts_dir = find_latest_ia_output(args.artefacts)
     
+    # タイムスタンプ付きの出力ディレクトリを作成
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamped_output_dir = os.path.join(args.output, timestamp)
+    os.makedirs(timestamped_output_dir, exist_ok=True)
+    
     # 実行パラメータの表示
     print("🔬 Researcher Agent を開始します")
     print("=" * 50)
     print(f"アーティファクト: {artefacts_dir}")
-    print(f"出力ディレクトリ: {args.output}")
+    print(f"出力ディレクトリ: {timestamped_output_dir}")
     if args.config:
         print(f"設定ファイル: {args.config}")
     print("=" * 50)
@@ -154,7 +160,7 @@ def main():
         
         report_path, plan_path = run(
             artefact_dir=artefacts_dir,
-            output_dir=args.output,
+            output_dir=timestamped_output_dir,
             config_path=args.config,
             api_key=api_key
         )

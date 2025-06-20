@@ -99,7 +99,7 @@ def _filter_non_water_features(gdf):
     return gdf[mask]
 
 
-def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
+def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None, include_water_features=False, osm_keys=None):
     """PyrosmでローカルPBFファイルから水語彙地名を抽出する
     
     Parameters
@@ -110,6 +110,10 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
         PBFファイルのパス。デフォルトは data/raw/osm/norte-latest.osm.pbf
     regex : re.Pattern, optional
         水語彙フィルタリング用の正規表現。デフォルトはWATER_TOKENS_EXTENDED
+    include_water_features : bool, optional
+        水域タグを持つ地物も含めるかどうか。デフォルトはFalse（除外）
+    osm_keys : List[str], optional
+        抽出対象のOSMキーのリスト。デフォルトは['place', 'landuse', 'man_made', 'highway']
         
     Returns
     -------
@@ -143,52 +147,24 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
         osm = OSM(str(pbf_path), bounding_box=[west, south, east, north])
         print("OSMデータを解析中...")
         
+        # OSMキーの設定（デフォルトは従来の4つのキー）
+        if osm_keys is None:
+            osm_keys = ['place', 'landuse', 'man_made', 'highway']
+        
         # 複数のカテゴリから地物を取得して統合
         gdfs = []
         
-        # place (村、集落等)
-        try:
-            place_gdf = osm.get_data_by_custom_criteria(
-                custom_filter={"place": True}
-            )
-            if not place_gdf.empty:
-                gdfs.append(place_gdf)
-                print(f"place: {len(place_gdf)}件")
-        except Exception as e:
-            print(f"place取得エラー: {e}")
-        
-        # landuse (土地利用)
-        try:
-            landuse_gdf = osm.get_data_by_custom_criteria(
-                custom_filter={"landuse": True}
-            )
-            if not landuse_gdf.empty:
-                gdfs.append(landuse_gdf)
-                print(f"landuse: {len(landuse_gdf)}件")
-        except Exception as e:
-            print(f"landuse取得エラー: {e}")
-        
-        # man_made
-        try:
-            man_made_gdf = osm.get_data_by_custom_criteria(
-                custom_filter={"man_made": True}
-            )
-            if not man_made_gdf.empty:
-                gdfs.append(man_made_gdf)
-                print(f"man_made: {len(man_made_gdf)}件")
-        except Exception as e:
-            print(f"man_made取得エラー: {e}")
-        
-        # highway
-        try:
-            highway_gdf = osm.get_data_by_custom_criteria(
-                custom_filter={"highway": True}
-            )
-            if not highway_gdf.empty:
-                gdfs.append(highway_gdf)
-                print(f"highway: {len(highway_gdf)}件")
-        except Exception as e:
-            print(f"highway取得エラー: {e}")
+        # 設定されたOSMキーから地物を動的に取得
+        for key in osm_keys:
+            try:
+                key_gdf = osm.get_data_by_custom_criteria(
+                    custom_filter={key: True}
+                )
+                if not key_gdf.empty:
+                    gdfs.append(key_gdf)
+                    print(f"{key}: {len(key_gdf)}件")
+            except Exception as e:
+                print(f"{key}取得エラー: {e}")
         
         # 全部のデータを統合
         if not gdfs:
@@ -216,13 +192,16 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex=None):
             print("水語彙を含む地物が見つかりません。")
             return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
         
-        # 水域タグを持つ地物を除外
-        gdf = _filter_non_water_features(gdf)
-        print(f"非水域フィルタ後: {len(gdf)}件")
-        
-        if gdf.empty:
-            print("水域以外の地物が見つかりません。")
-            return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+        # 水域タグを持つ地物を除外（オプション）
+        if not include_water_features:
+            gdf = _filter_non_water_features(gdf)
+            print(f"非水域フィルタ後: {len(gdf)}件")
+            
+            if gdf.empty:
+                print("水域以外の地物が見つかりません。")
+                return gpd.GeoDataFrame([], columns=["name", "geometry", "source"], crs="EPSG:4326")
+        else:
+            print(f"水域タグ除外をスキップ: {len(gdf)}件")
         
         # 結果の整理
         records = []

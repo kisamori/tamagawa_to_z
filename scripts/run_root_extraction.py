@@ -205,10 +205,88 @@ def parse_args():
         help='可視化画像の出力ディレクトリ'
     )
     
+    # 水域タグ除外ルール無効化オプション
+    parser.add_argument(
+        '--include-water-features',
+        action='store_true',
+        help='水域タグを持つ地物も地名候補として含める（デフォルトは除外）'
+    )
+    
+    # 新語根マージ無効化オプション
+    parser.add_argument(
+        '--no-merge-roots',
+        action='store_true',
+        help='新語根の自動マージを無効化する'
+    )
+    
+    # OSMキー設定オプション
+    parser.add_argument(
+        '--osm-keys-config',
+        type=str,
+        default=str(PROJECT_ROOT / 'data/config/osm_keys.yaml'),
+        help='OSMキー設定ファイルのパス'
+    )
+    parser.add_argument(
+        '--osm-keys-mode',
+        type=str,
+        choices=['conservative', 'standard', 'extended', 'water_focused'],
+        default='standard',
+        help='OSMキー抽出モード (conservative/standard/extended/water_focused)'
+    )
+    
     return parser.parse_args()
 
 
-def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None):
+def load_osm_keys_config(config_path, mode='standard'):
+    """
+    OSMキー設定ファイルを読み込み、指定されたモードのキーリストを返す
+    
+    Args:
+        config_path: 設定ファイルのパス
+        mode: 抽出モード ('conservative', 'standard', 'extended', 'water_focused')
+        
+    Returns:
+        List[str]: OSMキーのリスト
+    """
+    try:
+        import yaml
+        
+        config_path = Path(config_path)
+        if not config_path.exists():
+            logger.warning(f"OSMキー設定ファイルが見つかりません: {config_path}")
+            logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+            return ['place', 'landuse', 'man_made', 'highway']
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        # 指定されたモードのキーを取得
+        if 'extraction_modes' in config and mode in config['extraction_modes']:
+            osm_keys = config['extraction_modes'][mode]
+            logger.info(f"OSMキー設定モード '{mode}': {osm_keys}")
+            return osm_keys
+        else:
+            logger.warning(f"指定されたモード '{mode}' が設定ファイルに見つかりません")
+            # フォールバック: default_keysを使用
+            if 'default_keys' in config:
+                osm_keys = config['default_keys']
+                logger.info(f"default_keysを使用: {osm_keys}")
+                return osm_keys
+            else:
+                logger.info("ハードコードされたデフォルトを使用: ['place', 'landuse', 'man_made', 'highway']")
+                return ['place', 'landuse', 'man_made', 'highway']
+                
+    except ImportError:
+        logger.error("PyYAMLがインストールされていません。pip install pyyaml を実行してください。")
+        logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+        return ['place', 'landuse', 'man_made', 'highway']
+    except Exception as e:
+        logger.error(f"OSMキー設定ファイルの読み込みエラー: {e}")
+        logger.info("デフォルトのキーを使用します: ['place', 'landuse', 'man_made', 'highway']")
+        return ['place', 'landuse', 'man_made', 'highway']
+
+
+def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None, include_water_features=False, osm_keys=None):
     """地名収集"""
     logger.info("=== 🌍 地名収集フェーズ開始 ===")
     
@@ -229,8 +307,10 @@ def collect_toponyms(bbox_coords, pbf_path, visualize=False, output_dir=None):
     
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
+    if osm_keys:
+        logger.info(f"OSMキー: {osm_keys}")
     try:
-        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex)
+        names = extract_toponyms_pyrosm(bbox, pbf_path, regex=water_regex, include_water_features=include_water_features, osm_keys=osm_keys)
         if names.empty:
             logger.warning("ローカルPBFからのデータ取得に失敗しました。")
         else:
@@ -359,8 +439,12 @@ def harmonize_toponyms(names, sample_size=None, visualize=False, output_dir=None
                 sample_names = names
                 logger.info(f"🎯 全{len(names)}件でLLMハーモナイゼーションを実行")
             
-            # LLMタグ付け実行
-            tagged_names = harmonizer.attach_llm_tags(sample_names, name_column="name")
+            # LLMタグ付け実行（候補地名を類似度検索対象に含める）
+            tagged_names = harmonizer.attach_llm_tags(
+                sample_names, 
+                name_column="name",
+                include_candidates=True  # 候補地名を類似度検索対象に含める
+            )
             
             # 新語根発見の試行
             logger.info("=== 🔍 新語根発見分析開始 ===")
@@ -480,8 +564,79 @@ def harmonize_toponyms(names, sample_size=None, visualize=False, output_dir=None
     return names, None
 
 
-def save_results(names, new_root_analysis, output_dir):
-    """結果の保存"""
+def create_backup(file_path):
+    """ファイルのバックアップを作成"""
+    if not file_path.exists():
+        return None
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = file_path.parent / f"{file_path.stem}_backup_{timestamp}{file_path.suffix}"
+    
+    import shutil
+    shutil.copy2(file_path, backup_path)
+    logger.info(f"📁 バックアップを作成: {backup_path}")
+    return backup_path
+
+
+def merge_new_roots_to_water_dict(new_root_analysis):
+    """新語根をwater_roots.csvに自動マージ"""
+    water_roots_path = PROJECT_ROOT / 'data/dict/water_roots.csv'
+    
+    # バックアップ作成
+    create_backup(water_roots_path)
+    
+    # 既存辞書読み込み
+    existing_roots = pd.read_csv(water_roots_path)
+    logger.info(f"📚 既存語根数: {len(existing_roots)}件")
+    
+    # 新語根抽出（status == 'proposed'のみ）
+    new_roots_data = []
+    for pattern, data in new_root_analysis.items():
+        if data['status'] == 'proposed' and data['proposal']:
+            proposal = data['proposal']
+            new_root = {
+                'root': proposal.get('root'),
+                'lang': proposal.get('lang'),
+                'regex_token': proposal.get('root'),  # 簡単なパターンとしてrootをそのまま使用
+                'meaning_en': proposal.get('meaning_en'),
+                'meaning_ja': proposal.get('meaning_ja'),
+                'weight': proposal.get('confidence', 0.5)  # confidenceをweightとして使用、デフォルトは0.5
+            }
+            new_roots_data.append(new_root)
+    
+    if not new_roots_data:
+        logger.info("🔍 マージする新語根がありません")
+        return
+    
+    new_roots_df = pd.DataFrame(new_roots_data)
+    logger.info(f"🆕 新語根候補: {len(new_roots_df)}件")
+    
+    # 重複チェック（既存のrootと重複するものを除外）
+    existing_roots_set = set(existing_roots['root'].str.lower())
+    new_roots_filtered = new_roots_df[~new_roots_df['root'].str.lower().isin(existing_roots_set)]
+    
+    duplicates_count = len(new_roots_df) - len(new_roots_filtered)
+    if duplicates_count > 0:
+        logger.info(f"⚠️  重複により除外された新語根: {duplicates_count}件")
+    
+    if len(new_roots_filtered) == 0:
+        logger.info("🔍 重複チェック後、マージする新語根がありません")
+        return
+    
+    # マージして保存
+    merged_roots = pd.concat([existing_roots, new_roots_filtered], ignore_index=True)
+    merged_roots.to_csv(water_roots_path, index=False)
+    
+    logger.info(f"✅ 新語根を{len(new_roots_filtered)}件マージしました")
+    logger.info(f"📚 更新後の語根数: {len(merged_roots)}件")
+    
+    # マージされた新語根を表示
+    for _, row in new_roots_filtered.iterrows():
+        logger.info(f"   + {row['root']} ({row['lang']}): {row['meaning_ja']}")
+
+
+def save_results(names, new_root_analysis, output_dir, merge_roots=True):
+    """結果の保存と新語根の自動マージ"""
     os.makedirs(output_dir, exist_ok=True)
     
     # 1. ハーモナイゼーション済み地名辞書の保存
@@ -489,9 +644,11 @@ def save_results(names, new_root_analysis, output_dir):
     names.to_csv(names_output_path, index=False)
     logger.info(f"ハーモナイゼーション済み地名辞書を {names_output_path} に保存しました")
     
-    # 2. 新語根分析結果の保存
+    # 2. 新語根分析結果の保存（data/dict/に保存）
     if new_root_analysis:
-        analysis_output_path = Path(output_dir) / 'new_root_analysis.csv'
+        dict_dir = PROJECT_ROOT / 'data/dict'
+        os.makedirs(dict_dir, exist_ok=True)
+        analysis_output_path = dict_dir / 'new_root_analysis.csv'
         
         analysis_rows = []
         for pattern, data in new_root_analysis.items():
@@ -518,6 +675,17 @@ def save_results(names, new_root_analysis, output_dir):
             logger.info(f"🎯 提案された新語根: {len(proposed_roots)}件")
             for _, row in proposed_roots.iterrows():
                 logger.info(f"   - {row['proposed_root']} ({row['proposed_lang']}): {row['proposed_meaning_ja']}")
+            
+            # 3. 新語根の自動マージ（デフォルト有効）
+            if merge_roots:
+                logger.info("=== 🔄 新語根の自動マージ開始 ===")
+                try:
+                    merge_new_roots_to_water_dict(new_root_analysis)
+                    logger.info("=== ✅ 新語根の自動マージ完了 ===")
+                except Exception as e:
+                    logger.error(f"❌ 新語根マージ中にエラー: {e}")
+            else:
+                logger.info("🔄 新語根マージは無効化されています")
         else:
             logger.info("🔍 今回は新語根の提案はありませんでした")
 
@@ -536,8 +704,11 @@ def main():
         viz_output_dir = Path(args.viz_output_dir) / f"root_extraction_{timestamp}"
         logger.info(f"📁 可視化出力ディレクトリ: {viz_output_dir}")
     
+    # OSMキー設定の読み込み
+    osm_keys = load_osm_keys_config(args.osm_keys_config, args.osm_keys_mode)
+    
     # フェーズ1: 地名収集
-    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir)
+    names = collect_toponyms(args.bbox, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir, include_water_features=args.include_water_features, osm_keys=osm_keys)
     if names is None or len(names) == 0:
         logger.error("地名収集に失敗しました。処理を終了します。")
         return
@@ -551,7 +722,7 @@ def main():
     )
     
     # フェーズ3: 結果保存
-    save_results(names, new_root_analysis, args.output_dir)
+    save_results(names, new_root_analysis, args.output_dir, merge_roots=not args.no_merge_roots)
     
     logger.info("=== ✅ 辞書作成と語根抽出専用スクリプト完了 ===")
     logger.info(f"結果は {args.output_dir} に保存されました")

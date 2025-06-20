@@ -314,6 +314,36 @@ class ToponymEmbedding:
             logger.error(f"Failed to load index: {e}")
             raise
     
+    def add_candidates_to_index(self, candidate_names: List[str]) -> None:
+        """
+        候補の地名を既存のインデックスに追加する
+        
+        Args:
+            candidate_names: 追加する候補地名のリスト
+        """
+        if not candidate_names:
+            logger.info("No candidate names to add to index")
+            return
+        
+        logger.info(f"Adding {len(candidate_names)} candidates to similarity index")
+        
+        # 既存のvariantsと重複チェック
+        existing_variants_set = set(self.variants)
+        new_candidates = [name for name in candidate_names if name not in existing_variants_set]
+        
+        if not new_candidates:
+            logger.info("All candidates already exist in index")
+            return
+        
+        logger.info(f"Adding {len(new_candidates)} new candidates (duplicates removed)")
+        
+        # 既存のvariantsに新しい候補を追加
+        extended_variants = self.variants + new_candidates
+        
+        # インデックス再構築
+        self.build_index(extended_variants)
+        logger.info(f"Index rebuilt with {len(self.variants)} total variants")
+    
     def get_stats(self) -> Dict:
         """
         インデックスの統計情報を取得する
