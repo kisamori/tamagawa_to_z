@@ -212,6 +212,13 @@ def parse_args():
         help='水域タグを持つ地物も地名候補として含める（デフォルトは除外）'
     )
     
+    # 新語根マージ無効化オプション
+    parser.add_argument(
+        '--no-merge-roots',
+        action='store_true',
+        help='新語根の自動マージを無効化する'
+    )
+    
     return parser.parse_args()
 
 
@@ -487,8 +494,78 @@ def harmonize_toponyms(names, sample_size=None, visualize=False, output_dir=None
     return names, None
 
 
-def save_results(names, new_root_analysis, output_dir):
-    """結果の保存"""
+def create_backup(file_path):
+    """ファイルのバックアップを作成"""
+    if not file_path.exists():
+        return None
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = file_path.parent / f"{file_path.stem}_backup_{timestamp}{file_path.suffix}"
+    
+    import shutil
+    shutil.copy2(file_path, backup_path)
+    logger.info(f"📁 バックアップを作成: {backup_path}")
+    return backup_path
+
+
+def merge_new_roots_to_water_dict(new_root_analysis):
+    """新語根をwater_roots.csvに自動マージ"""
+    water_roots_path = PROJECT_ROOT / 'data/dict/water_roots.csv'
+    
+    # バックアップ作成
+    create_backup(water_roots_path)
+    
+    # 既存辞書読み込み
+    existing_roots = pd.read_csv(water_roots_path)
+    logger.info(f"📚 既存語根数: {len(existing_roots)}件")
+    
+    # 新語根抽出（status == 'proposed'のみ）
+    new_roots_data = []
+    for pattern, data in new_root_analysis.items():
+        if data['status'] == 'proposed' and data['proposal']:
+            proposal = data['proposal']
+            new_root = {
+                'root': proposal.get('root'),
+                'lang': proposal.get('lang'),
+                'regex_token': proposal.get('root'),  # 簡単なパターンとしてrootをそのまま使用
+                'meaning_en': proposal.get('meaning_en'),
+                'meaning_ja': proposal.get('meaning_ja')
+            }
+            new_roots_data.append(new_root)
+    
+    if not new_roots_data:
+        logger.info("🔍 マージする新語根がありません")
+        return
+    
+    new_roots_df = pd.DataFrame(new_roots_data)
+    logger.info(f"🆕 新語根候補: {len(new_roots_df)}件")
+    
+    # 重複チェック（既存のrootと重複するものを除外）
+    existing_roots_set = set(existing_roots['root'].str.lower())
+    new_roots_filtered = new_roots_df[~new_roots_df['root'].str.lower().isin(existing_roots_set)]
+    
+    duplicates_count = len(new_roots_df) - len(new_roots_filtered)
+    if duplicates_count > 0:
+        logger.info(f"⚠️  重複により除外された新語根: {duplicates_count}件")
+    
+    if len(new_roots_filtered) == 0:
+        logger.info("🔍 重複チェック後、マージする新語根がありません")
+        return
+    
+    # マージして保存
+    merged_roots = pd.concat([existing_roots, new_roots_filtered], ignore_index=True)
+    merged_roots.to_csv(water_roots_path, index=False)
+    
+    logger.info(f"✅ 新語根を{len(new_roots_filtered)}件マージしました")
+    logger.info(f"📚 更新後の語根数: {len(merged_roots)}件")
+    
+    # マージされた新語根を表示
+    for _, row in new_roots_filtered.iterrows():
+        logger.info(f"   + {row['root']} ({row['lang']}): {row['meaning_ja']}")
+
+
+def save_results(names, new_root_analysis, output_dir, merge_roots=True):
+    """結果の保存と新語根の自動マージ"""
     os.makedirs(output_dir, exist_ok=True)
     
     # 1. ハーモナイゼーション済み地名辞書の保存
@@ -496,9 +573,11 @@ def save_results(names, new_root_analysis, output_dir):
     names.to_csv(names_output_path, index=False)
     logger.info(f"ハーモナイゼーション済み地名辞書を {names_output_path} に保存しました")
     
-    # 2. 新語根分析結果の保存
+    # 2. 新語根分析結果の保存（data/dict/に保存）
     if new_root_analysis:
-        analysis_output_path = Path(output_dir) / 'new_root_analysis.csv'
+        dict_dir = PROJECT_ROOT / 'data/dict'
+        os.makedirs(dict_dir, exist_ok=True)
+        analysis_output_path = dict_dir / 'new_root_analysis.csv'
         
         analysis_rows = []
         for pattern, data in new_root_analysis.items():
@@ -525,6 +604,17 @@ def save_results(names, new_root_analysis, output_dir):
             logger.info(f"🎯 提案された新語根: {len(proposed_roots)}件")
             for _, row in proposed_roots.iterrows():
                 logger.info(f"   - {row['proposed_root']} ({row['proposed_lang']}): {row['proposed_meaning_ja']}")
+            
+            # 3. 新語根の自動マージ（デフォルト有効）
+            if merge_roots:
+                logger.info("=== 🔄 新語根の自動マージ開始 ===")
+                try:
+                    merge_new_roots_to_water_dict(new_root_analysis)
+                    logger.info("=== ✅ 新語根の自動マージ完了 ===")
+                except Exception as e:
+                    logger.error(f"❌ 新語根マージ中にエラー: {e}")
+            else:
+                logger.info("🔄 新語根マージは無効化されています")
         else:
             logger.info("🔍 今回は新語根の提案はありませんでした")
 
@@ -558,7 +648,7 @@ def main():
     )
     
     # フェーズ3: 結果保存
-    save_results(names, new_root_analysis, args.output_dir)
+    save_results(names, new_root_analysis, args.output_dir, merge_roots=not args.no_merge_roots)
     
     logger.info("=== ✅ 辞書作成と語根抽出専用スクリプト完了 ===")
     logger.info(f"結果は {args.output_dir} に保存されました")

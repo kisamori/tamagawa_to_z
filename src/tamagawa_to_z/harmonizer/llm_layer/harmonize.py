@@ -49,7 +49,7 @@ class ToponymHarmonizer:
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4o",
         embedding_model: str = "sentence-transformers/distiluse-base-multilingual-cased-v2",
         max_retries: int = 3,
         timeout: float = 30.0,
