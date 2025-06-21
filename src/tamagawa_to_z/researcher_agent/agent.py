@@ -177,7 +177,7 @@ def run(artefact_dir: str,
                 "cost": 0.2
             },
             "max_proposals": 3,
-            "llm_model": "gpt-4",
+            "llm_model": "o3",
             "temperature": 0.3
         }
     

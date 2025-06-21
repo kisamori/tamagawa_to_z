@@ -261,18 +261,27 @@ class RootCauseAnalyzer:
             # Build analysis prompt
             prompt = self._build_analysis_prompt(cluster_type, failures)
             
-            # Call LLM
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": prompt}
-                ],
+            # Responses APIでの実行
+            thread = self.client.responses.threads.create()
+            self.client.responses.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=prompt
+            )
+            
+            run = self.client.responses.threads.runs.create_and_poll(
+                thread_id=thread.id,
+                model="o3",
+                instructions=self._get_system_prompt(),
                 temperature=0.3
             )
             
+            # 最終メッセージを取得
+            final_run = self.client.responses.threads.runs.retrieve(run.id)
+            response_content = final_run.latest_message.content if final_run.latest_message else ""
+            
             # Parse response
-            analysis = response.choices[0].message.content
+            analysis = response_content
             
             # Extract structured information
             root_cause, suggested_fix = self._parse_llm_response(analysis)

@@ -135,17 +135,24 @@ Respond in this JSON format:
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in geospatial parameter optimization for archaeological site detection."},
-                    {"role": "user", "content": prompt}
-                ],
+            # Responses APIでの実行
+            thread = self.client.responses.threads.create()
+            self.client.responses.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=prompt
+            )
+            
+            run = self.client.responses.threads.runs.create_and_poll(
+                thread_id=thread.id,
+                model="o3",
+                instructions="You are an expert in geospatial parameter optimization for archaeological site detection.",
                 temperature=0.3
             )
             
-            # Parse JSON response
-            response_text = response.choices[0].message.content
+            # 最終メッセージを取得
+            final_run = self.client.responses.threads.runs.retrieve(run.id)
+            response_text = final_run.latest_message.content if final_run.latest_message else ""
             # Extract JSON from response (handle markdown code blocks)
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
@@ -214,16 +221,24 @@ Respond in this JSON format:
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in NLP pipeline optimization and prompt engineering."},
-                    {"role": "user", "content": prompt}
-                ],
+            # Responses APIでの実行
+            thread = self.client.responses.threads.create()
+            self.client.responses.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=prompt
+            )
+            
+            run = self.client.responses.threads.runs.create_and_poll(
+                thread_id=thread.id,
+                model="o3",
+                instructions="You are an expert in NLP pipeline optimization and prompt engineering.",
                 temperature=0.4
             )
             
-            response_text = response.choices[0].message.content
+            # 最終メッセージを取得
+            final_run = self.client.responses.threads.runs.retrieve(run.id)
+            response_text = final_run.latest_message.content if final_run.latest_message else ""
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:

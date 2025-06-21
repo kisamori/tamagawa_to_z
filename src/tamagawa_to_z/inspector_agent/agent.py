@@ -40,11 +40,12 @@ class InspectorValidatorAgent:
         self._create_assistant()
     
     def _create_assistant(self):
-        """OpenAI Assistant を作成する"""
-        self.assistant = self.client.beta.assistants.create(
-            name="InspectorValidator",
-            model="gpt-4o",
-            instructions="""あなたは多言語トポニム解析システムのInspector-Validator Agentです。
+        """OpenAI Assistant を作成する - Responses APIでは不要になった"""
+        # Responses APIを使用するため、assistantは不要
+        self.assistant = None
+        
+        # Responses APIで使用するシステム指示を保存
+        self.system_instructions = """あなたは多言語トポニム解析システムのInspector-Validator Agentです。
 
 あなたの役割：
 1. 候補抽出結果のメトリクス（Recall@K, mAP, workload等）を分析
@@ -62,12 +63,7 @@ class InspectorValidatorAgent:
 2. add_exclude_mask: 除外マスクの追加（都市部、保護区域等）
 3. add_root_weight: 語根重み調整（igarapé、lagoa等の重要語彙）
 
-必ず具体的で実行可能な改善案を1件提案してください。""",
-            tools=[
-                {"type": "function", "function": PROPOSE_SCHEMA},
-                {"type": "function", "function": DIAGNOSE_SCHEMA}
-            ]
-        )
+必ず具体的で実行可能な改善案を1件提案してください。"""
     
     def _build_analysis_prompt(self, metrics: Dict[str, float], 
                               spatial_stats: Dict[str, float],
@@ -166,18 +162,24 @@ class InspectorValidatorAgent:
         # 分析プロンプトの構築
         prompt = self._build_analysis_prompt(metrics, spatial_stats, meta_info)
         
-        # OpenAI Assistant による分析
-        thread = self.client.beta.threads.create()
-        self.client.beta.threads.messages.create(
+        # Responses API による分析
+        thread = self.client.responses.threads.create()
+        self.client.responses.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=prompt
         )
         
-        # 実行と結果取得
-        run = self.client.beta.threads.runs.create_and_poll(
+        # 実行と結果取得（tools定義をここで渡す）
+        run = self.client.responses.threads.runs.create_and_poll(
             thread_id=thread.id,
-            assistant_id=self.assistant.id
+            model="o3",
+            instructions=self.system_instructions,
+            tools=[
+                {"type": "function", **PROPOSE_SCHEMA},
+                {"type": "function", **DIAGNOSE_SCHEMA}
+            ],
+            tool_choice="auto"
         )
         
         # 結果の処理
@@ -186,11 +188,32 @@ class InspectorValidatorAgent:
         
         if run.status == "requires_action":
             # Function callの結果を処理
+            tool_outputs = []
             for tool_call in run.required_action.submit_tool_outputs.tool_calls:
                 if tool_call.function.name == "diagnose_results":
                     diagnosis = json.loads(tool_call.function.arguments)
+                    tool_outputs.append({
+                        "tool_call_id": tool_call.id,
+                        "output": json.dumps({"status": "diagnosed"})
+                    })
                 elif tool_call.function.name == "propose_action":
                     proposal = json.loads(tool_call.function.arguments)
+                    tool_outputs.append({
+                        "tool_call_id": tool_call.id,
+                        "output": json.dumps({"status": "proposed"})
+                    })
+            
+            # Function callの結果を送信
+            if tool_outputs:
+                run = self.client.responses.threads.runs.submit_tool_outputs(
+                    thread_id=thread.id,
+                    run_id=run.id,
+                    tool_outputs=tool_outputs
+                )
+                
+                # 最終結果を取得
+                final_run = self.client.responses.threads.runs.retrieve(run.id)
+                # 必要に応じて最終メッセージからさらに結果を取得する処理を追加
         
         # 結果の統合
         results = {
