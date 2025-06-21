@@ -44,6 +44,28 @@ class RootCauseAnalyzer:
         """
         self.client = client
         self.data = data
+        self.model = "o3"
+
+    def _run_llm(self, system_prompt: str, user_prompt: str, temperature: float = 0.3) -> str:
+        """Call the Responses API and return generated text."""
+        thread = self.client.responses.threads.create()
+        self.client.responses.threads.messages.create(
+            thread_id=thread.id,
+            role="system",
+            content=system_prompt,
+        )
+        self.client.responses.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=user_prompt,
+        )
+        run = self.client.responses.threads.runs.create_and_poll(
+            thread_id=thread.id,
+            model=self.model,
+            temperature=temperature,
+        )
+        final = self.client.responses.threads.runs.retrieve(run.id)
+        return getattr(final.latest_message, "content", "")
     
     def analyze(self) -> List[FailureCluster]:
         """
@@ -257,22 +279,16 @@ class RootCauseAnalyzer:
             # Prepare context for LLM
             cluster_type = cluster.get('type', 'unknown')
             failures = cluster.get('failures', [])
-            
+
             # Build analysis prompt
             prompt = self._build_analysis_prompt(cluster_type, failures)
-            
+
             # Call LLM
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3
+            analysis = self._run_llm(
+                self._get_system_prompt(),
+                prompt,
+                temperature=0.3,
             )
-            
-            # Parse response
-            analysis = response.choices[0].message.content
             
             # Extract structured information
             root_cause, suggested_fix = self._parse_llm_response(analysis)

@@ -36,15 +36,12 @@ class InspectorValidatorAgent:
             OpenAI API キー（環境変数OPENAI_API_KEYからも読み込み可能）
         """
         self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        self.assistant = None
-        self._create_assistant()
-    
-    def _create_assistant(self):
-        """OpenAI Assistant を作成する"""
-        self.assistant = self.client.beta.assistants.create(
-            name="InspectorValidator",
-            model="gpt-4o",
-            instructions="""あなたは多言語トポニム解析システムのInspector-Validator Agentです。
+        self.model = "o3"
+        self.tools = [
+            {"type": "function", "function": PROPOSE_SCHEMA},
+            {"type": "function", "function": DIAGNOSE_SCHEMA},
+        ]
+        self.instructions = """あなたは多言語トポニム解析システムのInspector-Validator Agentです。
 
 あなたの役割：
 1. 候補抽出結果のメトリクス（Recall@K, mAP, workload等）を分析
@@ -62,12 +59,8 @@ class InspectorValidatorAgent:
 2. add_exclude_mask: 除外マスクの追加（都市部、保護区域等）
 3. add_root_weight: 語根重み調整（igarapé、lagoa等の重要語彙）
 
-必ず具体的で実行可能な改善案を1件提案してください。""",
-            tools=[
-                {"type": "function", "function": PROPOSE_SCHEMA},
-                {"type": "function", "function": DIAGNOSE_SCHEMA}
-            ]
-        )
+必ず具体的で実行可能な改善案を1件提案してください。"""
+    
     
     def _build_analysis_prompt(self, metrics: Dict[str, float], 
                               spatial_stats: Dict[str, float],
@@ -166,18 +159,25 @@ class InspectorValidatorAgent:
         # 分析プロンプトの構築
         prompt = self._build_analysis_prompt(metrics, spatial_stats, meta_info)
         
-        # OpenAI Assistant による分析
-        thread = self.client.beta.threads.create()
-        self.client.beta.threads.messages.create(
+        # Responses API による分析
+        thread = self.client.responses.threads.create()
+        self.client.responses.threads.messages.create(
+            thread_id=thread.id,
+            role="system",
+            content=self.instructions,
+        )
+        self.client.responses.threads.messages.create(
             thread_id=thread.id,
             role="user",
-            content=prompt
+            content=prompt,
         )
-        
+
         # 実行と結果取得
-        run = self.client.beta.threads.runs.create_and_poll(
+        run = self.client.responses.threads.runs.create_and_poll(
             thread_id=thread.id,
-            assistant_id=self.assistant.id
+            model=self.model,
+            tools=self.tools,
+            tool_choice="auto"
         )
         
         # 結果の処理

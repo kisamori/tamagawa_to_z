@@ -50,6 +50,28 @@ class ProposalGenerator:
         self.data = data
         self.failure_clusters = failure_clusters
         self.config = config
+        self.model = "o3"
+
+    def _run_llm(self, system_prompt: str, user_prompt: str, temperature: float = 0.3) -> str:
+        """Call the Responses API and return generated text."""
+        thread = self.client.responses.threads.create()
+        self.client.responses.threads.messages.create(
+            thread_id=thread.id,
+            role="system",
+            content=system_prompt,
+        )
+        self.client.responses.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=user_prompt,
+        )
+        run = self.client.responses.threads.runs.create_and_poll(
+            thread_id=thread.id,
+            model=self.model,
+            temperature=temperature,
+        )
+        final = self.client.responses.threads.runs.retrieve(run.id)
+        return getattr(final.latest_message, "content", "")
     
     def generate(self, n: int = 3) -> List[Proposal]:
         """
@@ -135,17 +157,13 @@ Respond in this JSON format:
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in geospatial parameter optimization for archaeological site detection."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3
+            response_text = self._run_llm(
+                "You are an expert in geospatial parameter optimization for archaeological site detection.",
+                prompt,
+                temperature=0.3,
             )
-            
+
             # Parse JSON response
-            response_text = response.choices[0].message.content
             # Extract JSON from response (handle markdown code blocks)
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
@@ -214,16 +232,11 @@ Respond in this JSON format:
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in NLP pipeline optimization and prompt engineering."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.4
+            response_text = self._run_llm(
+                "You are an expert in NLP pipeline optimization and prompt engineering.",
+                prompt,
+                temperature=0.4,
             )
-            
-            response_text = response.choices[0].message.content
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:
