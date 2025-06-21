@@ -31,6 +31,14 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+# .envファイルを読み込み
+try:
+    from dotenv import load_dotenv
+    load_dotenv(project_root / ".env")
+except ImportError:
+    # python-dotenvがインストールされていない場合はスキップ
+    pass
+
 from tamagawa_to_z.researcher_agent import run
 
 
@@ -63,7 +71,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--api-key",
-        help="OpenAI APIキー（環境変数OPENAI_API_KEYからも読み込み可能）"
+        help="OpenAI APIキー（環境変数OPENAI_API_KEY_TIRE5からも読み込み可能）"
     )
     
     parser.add_argument(
@@ -90,9 +98,9 @@ def validate_inputs(args):
         errors.append(f"設定ファイルが見つかりません: {args.config}")
     
     # OpenAI APIキーの確認
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY_TIRE5")
     if not api_key:
-        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEYを設定してください。")
+        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEY_TIRE5を設定してください。")
     
     if errors:
         print("❌ 入力エラー:")
@@ -152,8 +160,8 @@ def main():
     
     try:
         # 環境変数の設定（必要に応じて）
-        if api_key and not os.getenv("OPENAI_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = api_key
+        if api_key and not os.getenv("OPENAI_API_KEY_TIRE5"):
+            os.environ["OPENAI_API_KEY_TIRE5"] = api_key
         
         # Researcher Agent の実行
         print("🧠 分析を開始しています...")

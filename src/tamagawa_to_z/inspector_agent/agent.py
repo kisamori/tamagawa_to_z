@@ -17,7 +17,7 @@ import yaml
 from jinja2 import Template
 from openai import OpenAI
 
-from .agent_schema import PROPOSE_SCHEMA, DIAGNOSE_SCHEMA, validate_action_params
+from .agent_schema import PROPOSE_SCHEMA, DIAGNOSE_SCHEMA, validate_action_params, create_tools_config
 from .metrics import calculate_all_metrics, analyze_spatial_distribution
 
 
@@ -35,16 +35,13 @@ class InspectorValidatorAgent:
         api_key : Optional[str]
             OpenAI API キー（環境変数OPENAI_API_KEYからも読み込み可能）
         """
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY_TIRE5"))
         self.assistant = None
         self._create_assistant()
     
     def _create_assistant(self):
-        """OpenAI Assistant を作成する - Responses APIでは不要になった"""
-        # Responses APIを使用するため、assistantは不要
-        self.assistant = None
-        
-        # Responses APIで使用するシステム指示を保存
+        """システム指示を準備する"""
+        # システム指示を保存
         self.system_instructions = """あなたは多言語トポニム解析システムのInspector-Validator Agentです。
 
 あなたの役割：
@@ -163,57 +160,27 @@ class InspectorValidatorAgent:
         prompt = self._build_analysis_prompt(metrics, spatial_stats, meta_info)
         
         # Responses API による分析
-        thread = self.client.responses.threads.create()
-        self.client.responses.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=prompt
-        )
-        
-        # 実行と結果取得（tools定義をここで渡す）
-        run = self.client.responses.threads.runs.create_and_poll(
-            thread_id=thread.id,
+        full_input = f"{self.system_instructions}\n\n{prompt}"
+        response = self.client.responses.create(
             model="o3",
-            instructions=self.system_instructions,
+            input=full_input,
             tools=[
-                {"type": "function", **PROPOSE_SCHEMA},
-                {"type": "function", **DIAGNOSE_SCHEMA}
-            ],
-            tool_choice="auto"
+                {"type": "function", "name": "diagnose_results", "function": DIAGNOSE_SCHEMA},
+                {"type": "function", "name": "propose_action", "function": PROPOSE_SCHEMA}
+            ]
         )
         
         # 結果の処理
         diagnosis = None
         proposal = None
         
-        if run.status == "requires_action":
+        if hasattr(response, 'tool_calls') and response.tool_calls:
             # Function callの結果を処理
-            tool_outputs = []
-            for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+            for tool_call in response.tool_calls:
                 if tool_call.function.name == "diagnose_results":
                     diagnosis = json.loads(tool_call.function.arguments)
-                    tool_outputs.append({
-                        "tool_call_id": tool_call.id,
-                        "output": json.dumps({"status": "diagnosed"})
-                    })
                 elif tool_call.function.name == "propose_action":
                     proposal = json.loads(tool_call.function.arguments)
-                    tool_outputs.append({
-                        "tool_call_id": tool_call.id,
-                        "output": json.dumps({"status": "proposed"})
-                    })
-            
-            # Function callの結果を送信
-            if tool_outputs:
-                run = self.client.responses.threads.runs.submit_tool_outputs(
-                    thread_id=thread.id,
-                    run_id=run.id,
-                    tool_outputs=tool_outputs
-                )
-                
-                # 最終結果を取得
-                final_run = self.client.responses.threads.runs.retrieve(run.id)
-                # 必要に応じて最終メッセージからさらに結果を取得する処理を追加
         
         # 結果の統合
         results = {

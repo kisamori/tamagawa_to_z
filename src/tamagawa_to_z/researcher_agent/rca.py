@@ -262,23 +262,21 @@ class RootCauseAnalyzer:
             prompt = self._build_analysis_prompt(cluster_type, failures)
             
             # Responses APIでの実行
-            thread = self.client.responses.threads.create()
-            self.client.responses.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=prompt
-            )
-            
-            run = self.client.responses.threads.runs.create_and_poll(
-                thread_id=thread.id,
+            full_input = f"{self._get_system_prompt()}\n\n{prompt}"
+            response = self.client.responses.create(
                 model="o3",
-                instructions=self._get_system_prompt(),
-                temperature=0.3
+                input=full_input
             )
             
-            # 最終メッセージを取得
-            final_run = self.client.responses.threads.runs.retrieve(run.id)
-            response_content = final_run.latest_message.content if final_run.latest_message else ""
+            # レスポンス内容を取得
+            if hasattr(response, 'output_text'):
+                response_content = response.output_text
+            elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+                response_content = response.output.text
+            elif hasattr(response, 'content'):
+                response_content = response.content
+            else:
+                response_content = ""
             
             # Parse response
             analysis = response_content

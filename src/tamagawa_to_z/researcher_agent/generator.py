@@ -136,24 +136,31 @@ Respond in this JSON format:
         
         try:
             # Responses APIでの実行
-            thread = self.client.responses.threads.create()
-            self.client.responses.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=prompt
-            )
-            
-            run = self.client.responses.threads.runs.create_and_poll(
-                thread_id=thread.id,
+            full_input = f"You are an expert in geospatial parameter optimization for archaeological site detection.\n\n{prompt}"
+            response = self.client.responses.create(
                 model="o3",
-                instructions="You are an expert in geospatial parameter optimization for archaeological site detection.",
-                temperature=0.3
+                input=full_input
             )
             
-            # 最終メッセージを取得
-            final_run = self.client.responses.threads.runs.retrieve(run.id)
-            response_text = final_run.latest_message.content if final_run.latest_message else ""
+            # レスポンス内容を取得
+            response_text = ""
+            if hasattr(response, 'output_text'):
+                response_text = response.output_text
+            elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+                response_text = response.output.text
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            elif hasattr(response, 'choices') and response.choices:
+                response_text = response.choices[0].message.content
+            else:
+                response_text = str(response)
+            
             # Extract JSON from response (handle markdown code blocks)
+            if not response_text or not hasattr(response_text, 'strip') or response_text.strip() == "":
+                return []
+                
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:
@@ -161,6 +168,9 @@ Respond in this JSON format:
             else:
                 json_part = response_text
             
+            if not json_part or not hasattr(json_part, 'strip') or not json_part.strip():
+                return []
+                
             data = json.loads(json_part)
             
             # Build changes list
@@ -222,23 +232,31 @@ Respond in this JSON format:
         
         try:
             # Responses APIでの実行
-            thread = self.client.responses.threads.create()
-            self.client.responses.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=prompt
-            )
-            
-            run = self.client.responses.threads.runs.create_and_poll(
-                thread_id=thread.id,
+            full_input = f"You are an expert in NLP pipeline optimization and prompt engineering.\n\n{prompt}"
+            response = self.client.responses.create(
                 model="o3",
-                instructions="You are an expert in NLP pipeline optimization and prompt engineering.",
-                temperature=0.4
+                input=full_input
             )
             
-            # 最終メッセージを取得
-            final_run = self.client.responses.threads.runs.retrieve(run.id)
-            response_text = final_run.latest_message.content if final_run.latest_message else ""
+            # レスポンス内容を取得
+            response_text = ""
+            if hasattr(response, 'output_text'):
+                response_text = response.output_text
+            elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+                response_text = response.output.text
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            elif hasattr(response, 'choices') and response.choices:
+                response_text = response.choices[0].message.content
+            else:
+                response_text = str(response)
+            
+            # Extract JSON from response (handle markdown code blocks)
+            if not response_text or not hasattr(response_text, 'strip') or response_text.strip() == "":
+                return []
+                
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:
@@ -246,6 +264,9 @@ Respond in this JSON format:
             else:
                 json_part = response_text
             
+            if not json_part or not hasattr(json_part, 'strip') or not json_part.strip():
+                return []
+                
             data = json.loads(json_part)
             
             # Build changes
