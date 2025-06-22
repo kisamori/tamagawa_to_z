@@ -36,7 +36,6 @@ code_extraction:
 default_paths:
   candidates: "data/interim/region_candidates.csv"
   toponym_dict: "data/dict/toponym_dict.csv"
-#  known_sites: "data/raw/known_sites.gpkg"
   known_sites: "data/known/known_sites.gpkg"
   param_yaml: "config/run_meta.yaml"
   

@@ -6,14 +6,12 @@
 
 Usage:
     python scripts/run_inspector.py --candidates data/interim/acre_candidates.csv \\
-                                   --known data/raw/known_sites.gpkg \\
                                    --output data/output/inspector_reports
 
 Example:
     # 基本実行
     python scripts/run_inspector.py \\
         --candidates data/interim/acre_candidates.csv \\
-        --known data/raw/known_sites.gpkg
 
     # メタ情報と辞書を含む実行
     python scripts/run_inspector.py \\
@@ -61,7 +59,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--known",
-        required=True,
+        default="data/known/known_sites.gpkg",
         help="既知遺跡データのファイルパス（.gpkg, .shp等のGISファイル）"
     )
     
