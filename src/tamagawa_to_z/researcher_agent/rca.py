@@ -264,7 +264,7 @@ class RootCauseAnalyzer:
             # Responses APIでの実行
             full_input = f"{self._get_system_prompt()}\n\n{prompt}"
             response = self.client.responses.create(
-                model="o3",
+                model="o3-pro",
                 input=full_input
             )
             
@@ -301,26 +301,26 @@ class RootCauseAnalyzer:
     
     def _get_system_prompt(self) -> str:
         """Get system prompt for LLM analysis."""
-        return """You are an expert in geospatial analysis and archaeological site detection systems.
+        return """あなたは地理空間解析と考古学遺跡検出システムの専門家です。
         
-Your task is to analyze failure patterns in a toponym-based archaeological site detection pipeline.
-The system extracts water-related place names and identifies potential ancient settlement sites.
+あなたのタスクは、地名ベースの考古学遺跡検出パイプラインにおける失敗パターンの分析です。
+このシステムは水関連の地名を抽出し、古代集落遺跡の可能性を特定します。
 
-Please provide:
-1. Root cause analysis of the failure pattern
-2. Specific suggested fixes or improvements
-3. Priority level assessment
+以下を提供してください：
+1. 失敗パターンの根本原因分析
+2. 具体的な修正提案または改善案
+3. 影響度に基づく優先度評価
 
-Focus on practical, implementable solutions."""
+実用的で実現可能な解決策に焦点を当ててください。"""
     
     def _build_analysis_prompt(self, cluster_type: str, failures: List[Dict[str, Any]]) -> str:
         """Build analysis prompt for a specific cluster."""
-        prompt = f"""## Failure Cluster Analysis
+        prompt = f"""## 失敗クラスター分析
 
-**Cluster Type**: {cluster_type}
-**Number of Issues**: {len(failures)}
+**クラスタータイプ**: {cluster_type}
+**問題数**: {len(failures)}
 
-**Failure Details**:
+**失敗詳細**:
 """
         
         for i, failure in enumerate(failures[:5], 1):  # Show top 5 failures
@@ -333,18 +333,18 @@ Focus on practical, implementable solutions."""
         
         prompt += f"""
 
-**Context**: This is a pipeline that:
-1. Extracts water-related toponyms from OpenStreetMap
-2. Calculates distances to current rivers
-3. Analyzes water occurrence frequency
-4. Identifies potential ancient river channels and settlements
+**コンテキスト**: これは以下の処理を行うパイプラインです：
+1. OpenStreetMapから水関連の地名を抽出
+2. 現在の河川までの距離を計算
+3. 水域出現頻度を解析
+4. 古代河川跡と集落の可能性を特定
 
-**Question**: What is the root cause of this failure pattern and how should it be fixed?
+**質問**: この失敗パターンの根本原因は何で、どのように修正すべきでしょうか？
 
-Please analyze and provide:
-1. **Root Cause**: Why is this pattern occurring?
-2. **Suggested Fix**: Specific parameter adjustments or process improvements
-3. **Priority**: High/Medium/Low based on impact"""
+分析して以下を提供してください：
+1. **根本原因**: なぜこのパターンが発生しているのか？
+2. **修正提案**: 具体的なパラメータ調整またはプロセス改善
+3. **優先度**: 影響度に基づくHigh/Medium/Low"""
         
         return prompt
     
@@ -381,6 +381,6 @@ Please analyze and provide:
                 suggested_fix = parts[1].strip()
             else:
                 root_cause = response.strip()
-                suggested_fix = "Review and adjust pipeline parameters"
+                suggested_fix = "パイプラインパラメータの見直しと調整"
         
         return root_cause.strip(), suggested_fix.strip()

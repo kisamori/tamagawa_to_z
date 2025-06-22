@@ -162,7 +162,7 @@ class InspectorValidatorAgent:
         # Responses API による分析
         full_input = f"{self.system_instructions}\n\n{prompt}"
         response = self.client.responses.create(
-            model="o3",
+            model="o3-pro",
             input=full_input,
             tools=[
                 {"type": "function", "name": "diagnose_results", "function": DIAGNOSE_SCHEMA},

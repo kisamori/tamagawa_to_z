@@ -11,7 +11,7 @@ max_proposals: 3      # Maximum number of proposals to generate
 temperature: 0.3      # LLM temperature for proposal generation
 
 # LLM configuration
-llm_model: "o3"
+llm_model: "o3-pro"
 max_tokens: 2000
 timeout_seconds: 60
 
@@ -36,7 +36,8 @@ code_extraction:
 default_paths:
   candidates: "data/interim/region_candidates.csv"
   toponym_dict: "data/dict/toponym_dict.csv"
-  known_sites: "data/raw/known_sites.gpkg"
+#  known_sites: "data/raw/known_sites.gpkg"
+  known_sites: "data/known/known_sites.gpkg"
   param_yaml: "config/run_meta.yaml"
   
 # Output formatting
