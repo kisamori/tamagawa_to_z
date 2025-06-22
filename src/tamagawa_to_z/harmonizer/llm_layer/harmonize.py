@@ -165,45 +165,25 @@ class ToponymHarmonizer:
                 
                 logger.info(f"   🌐 Calling OpenAI API (attempt {attempt + 1}/{self.max_retries})...")
                 
-                # Responses APIでの実行
-                thread = self.client.responses.threads.create()
-                self.client.responses.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=messages[1]["content"]  # user prompt
-                )
-                
-                run = self.client.responses.threads.runs.create_and_poll(
-                    thread_id=thread.id,
+                response = self.client.chat.completions.create(
                     model=self.model,
-                    instructions=messages[0]["content"],  # system prompt
-                    tools=[{"type": "function", **DECIDE_SCHEMA}],
+                    messages=messages,
+                    tools=[DECIDE_SCHEMA],
                     tool_choice={"type": "function", "function": {"name": "decide_toponym_relation"}},
+                    timeout=self.timeout,
                     temperature=0.1  # 一貫性を重視
                 )
                 
                 duration = time.time() - start_time
                 self.stats['api_call_duration'].append(duration)
                 
-                # Tool call結果を処理
-                function_result = None
-                if run.status == "requires_action":
-                    tool_call = run.required_action.submit_tool_outputs.tool_calls[0]
-                    raw_arguments = tool_call.function.arguments
+                # Tool call結果を取得
+                if response.choices[0].message.tool_calls:
+                    raw_arguments = response.choices[0].message.tool_calls[0].function.arguments
                     logger.debug(f"   🔍 Raw LLM arguments: {raw_arguments}")
                     
                     try:
                         function_result = json.loads(raw_arguments)
-                        
-                        # Tool callの結果を送信
-                        self.client.responses.threads.runs.submit_tool_outputs(
-                            thread_id=thread.id,
-                            run_id=run.id,
-                            tool_outputs=[{
-                                "tool_call_id": tool_call.id,
-                                "output": json.dumps({"status": "processed"})
-                            }]
-                        )
                     except json.JSONDecodeError as e:
                         logger.error(f"   ❌ JSON parse error: {e}")
                         logger.error(f"   📄 Raw response: {raw_arguments}")
@@ -651,45 +631,25 @@ class ToponymHarmonizer:
                 
                 logger.info(f"   🌐 Calling OpenAI API for root proposal (attempt {attempt + 1}/{self.max_retries})...")
                 
-                # Responses APIでの実行  
-                thread = self.client.responses.threads.create()
-                self.client.responses.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=messages[1]["content"]  # user prompt
-                )
-                
-                run = self.client.responses.threads.runs.create_and_poll(
-                    thread_id=thread.id,
+                response = self.client.chat.completions.create(
                     model=self.model,
-                    instructions=messages[0]["content"],  # system prompt
-                    tools=[{"type": "function", **PROPOSE_ROOT_SCHEMA}],
+                    messages=messages,
+                    tools=[PROPOSE_ROOT_SCHEMA],
                     tool_choice={"type": "function", "function": {"name": "propose_new_water_root"}},
+                    timeout=self.timeout,
                     temperature=0.1
                 )
                 
                 duration = time.time() - start_time
                 self.stats['api_call_duration'].append(duration)
                 
-                # Tool call結果を処理
-                function_result = None
-                if run.status == "requires_action":
-                    tool_call = run.required_action.submit_tool_outputs.tool_calls[0]
-                    raw_arguments = tool_call.function.arguments
+                # Tool call結果を取得
+                if response.choices[0].message.tool_calls:
+                    raw_arguments = response.choices[0].message.tool_calls[0].function.arguments
                     logger.debug(f"   🔍 Raw LLM arguments: {raw_arguments}")
                     
                     try:
                         function_result = json.loads(raw_arguments)
-                        
-                        # Tool callの結果を送信
-                        self.client.responses.threads.runs.submit_tool_outputs(
-                            thread_id=thread.id,
-                            run_id=run.id,
-                            tool_outputs=[{
-                                "tool_call_id": tool_call.id,
-                                "output": json.dumps({"status": "processed"})
-                            }]
-                        )
                     except json.JSONDecodeError as e:
                         logger.error(f"   ❌ JSON parse error: {e}")
                         raise ValueError(f"Invalid JSON in LLM response: {e}")
