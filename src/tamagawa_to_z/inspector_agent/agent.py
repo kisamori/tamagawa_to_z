@@ -8,6 +8,8 @@ import json
 import os
 import pathlib
 import uuid
+import zipfile
+import tempfile
 from datetime import datetime
 from typing import Dict, Optional, Any
 
@@ -139,7 +141,12 @@ class InspectorValidatorAgent:
         # geometry列を文字列として明示的に扱う
         if 'geometry' in candidates.columns:
             candidates['geometry'] = candidates['geometry'].astype(str)
-        known_sites = gpd.read_file(known_sites_path)
+        
+        # 既知サイトの読み込み（KMZ対応）
+        if known_sites_path.endswith('.kmz'):
+            known_sites = self._load_kmz_file(known_sites_path)
+        else:
+            known_sites = gpd.read_file(known_sites_path)
         
         # メタ情報の読み込み
         meta_info = {}
@@ -321,6 +328,60 @@ class InspectorValidatorAgent:
             report += "```\n"
         
         return report
+    
+    def _load_kmz_file(self, kmz_path: str) -> 'gpd.GeoDataFrame':
+        """KMZファイルを読み込む"""
+        import geopandas as gpd
+        from pathlib import Path
+        from xml.etree import ElementTree as ET
+        from shapely.geometry import Point
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # KMZファイルを展開
+            with zipfile.ZipFile(kmz_path, 'r') as kmz:
+                kml_files = [name for name in kmz.namelist() if name.endswith('.kml')]
+                if not kml_files:
+                    raise ValueError(f"No KML files found in KMZ: {kmz_path}")
+                
+                # 最初のKMLファイルを展開
+                kml_filename = kml_files[0]
+                kml_content = kmz.read(kml_filename).decode('utf-8')
+        
+        # XMLを解析
+        root = ET.fromstring(kml_content)
+        
+        # 名前空間の定義
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+        
+        data = []
+        # Placemarkを探して処理
+        placemarks = root.findall('.//kml:Placemark', ns)
+        
+        for placemark in placemarks:
+            # 場所名を取得
+            name_element = placemark.find('kml:name', ns)
+            place_name = name_element.text if name_element is not None else ''
+            
+            # 座標を取得
+            coordinates_element = placemark.find('.//kml:coordinates', ns)
+            if coordinates_element is not None:
+                coords_text = coordinates_element.text.strip()
+                coords_parts = coords_text.split(',')
+                if len(coords_parts) >= 2:
+                    try:
+                        longitude = float(coords_parts[0])
+                        latitude = float(coords_parts[1])
+                        
+                        data.append({
+                            'name': place_name,
+                            'geometry': Point(longitude, latitude)
+                        })
+                    except ValueError:
+                        continue
+        
+        return gpd.GeoDataFrame(data, crs='EPSG:4326')
 
 
 def run(candidates_path: str, 

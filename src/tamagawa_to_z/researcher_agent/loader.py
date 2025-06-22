@@ -141,10 +141,12 @@ class ArtefactLoader:
         return pd.DataFrame()
     
     def _load_known_sites(self) -> gpd.GeoDataFrame:
-        """Load known sites from GeoPackage or Shapefile."""
+        """Load known sites from GeoPackage, Shapefile, or KMZ."""
         filename_patterns = [
+            "known_acre.kmz",
             "known_sites.gpkg",
             "known_sites.shp",
+            "*acre*.kmz",
             "*sites*.gpkg",
             "*sites*.shp"
         ]
@@ -153,16 +155,74 @@ class ArtefactLoader:
         
         if path:
             try:
-                gdf = gpd.read_file(path)
+                if str(path).endswith('.kmz'):
+                    # KMZファイルの場合は特別な処理
+                    gdf = self._load_kmz_file(path)
+                else:
+                    gdf = gpd.read_file(path)
                 self.meta_info['known_sites_path'] = str(path)
                 print(f"✅ Loaded known sites from: {path}")
                 return gdf
             except Exception as e:
                 print(f"Warning: Could not load {path}: {e}")
         
-        default_path = self.config.get('default_paths', {}).get('known_sites', 'data/raw/known_sites.gpkg')
+        default_path = self.config.get('default_paths', {}).get('known_sites', 'data/known/known_acre.kmz')
         print(f"Warning: No known sites file found. Expected: {default_path}")
         return gpd.GeoDataFrame()
+    
+    def _load_kmz_file(self, kmz_path: Path) -> gpd.GeoDataFrame:
+        """Load KMZ file by extracting KML and parsing XML."""
+        import zipfile
+        import tempfile
+        from xml.etree import ElementTree as ET
+        from shapely.geometry import Point
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # KMZファイルを展開
+            with zipfile.ZipFile(kmz_path, 'r') as kmz:
+                kml_files = [name for name in kmz.namelist() if name.endswith('.kml')]
+                if not kml_files:
+                    raise ValueError(f"No KML files found in KMZ: {kmz_path}")
+                
+                # 最初のKMLファイルを展開
+                kml_filename = kml_files[0]
+                kml_content = kmz.read(kml_filename).decode('utf-8')
+        
+        # XMLを解析
+        root = ET.fromstring(kml_content)
+        
+        # 名前空間の定義
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+        
+        data = []
+        # Placemarkを探して処理
+        placemarks = root.findall('.//kml:Placemark', ns)
+        
+        for placemark in placemarks:
+            # 場所名を取得
+            name_element = placemark.find('kml:name', ns)
+            place_name = name_element.text if name_element is not None else ''
+            
+            # 座標を取得
+            coordinates_element = placemark.find('.//kml:coordinates', ns)
+            if coordinates_element is not None:
+                coords_text = coordinates_element.text.strip()
+                coords_parts = coords_text.split(',')
+                if len(coords_parts) >= 2:
+                    try:
+                        longitude = float(coords_parts[0])
+                        latitude = float(coords_parts[1])
+                        
+                        data.append({
+                            'name': place_name,
+                            'geometry': Point(longitude, latitude)
+                        })
+                    except ValueError:
+                        continue
+        
+        return gpd.GeoDataFrame(data, crs='EPSG:4326')
     
     def _load_param_yaml(self) -> Dict[str, Any]:
         """Load parameter YAML file."""

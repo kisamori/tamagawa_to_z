@@ -16,7 +16,7 @@ Example:
     # メタ情報と辞書を含む実行
     python scripts/run_inspector.py \\
         --candidates data/interim/acre_candidates.csv \\
-        --known data/raw/known_sites.gpkg \\
+        --known data/known/known_acre.kmz \\
         --meta config/run_meta.yaml \\
         --dict data/dict/toponym_dict.csv \\
         --output reports/
@@ -59,8 +59,8 @@ def parse_arguments():
     
     parser.add_argument(
         "--known",
-        default="data/known/known_sites.gpkg",
-        help="既知遺跡データのファイルパス（.gpkg, .shp等のGISファイル）"
+        default="data/known/known_acre.kmz",
+        help="既知遺跡データのファイルパス（.gpkg, .shp, .kmz等のGISファイル）"
     )
     
     # オプション引数
@@ -107,8 +107,8 @@ def validate_inputs(args):
     # 既知遺跡データファイルの確認
     if not os.path.exists(args.known):
         errors.append(f"既知遺跡データファイルが見つかりません: {args.known}")
-    elif not any(args.known.endswith(ext) for ext in ['.gpkg', '.shp', '.geojson']):
-        errors.append(f"既知遺跡データファイルはGIS形式（.gpkg, .shp, .geojson）である必要があります: {args.known}")
+    elif not any(args.known.endswith(ext) for ext in ['.gpkg', '.shp', '.geojson', '.kmz']):
+        errors.append(f"既知遺跡データファイルはGIS形式（.gpkg, .shp, .geojson, .kmz）である必要があります: {args.known}")
     
     # メタファイルの確認（オプション）
     if args.meta and not os.path.exists(args.meta):
