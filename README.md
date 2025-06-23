@@ -99,54 +99,83 @@ pip install -r requirements.txt
 
 ## 使い方
 
-### Jupyter Notebook
+### 最新の推奨ワークフロー（Hybrid-BO v2.0）
 
-`notebooks/99_kaggle_demo.ipynb` を使用して、アマゾン流域の水場系トポニムを抽出し、データ同化シミュレーションとマルチエージェント分析により古河道候補地点を特定します。
+このプロジェクトは Bayesian Optimization と LLM 統合による最適化フレームワークに対応しています。以下の手順で実行してください：
+
+#### 1. データ準備・分割
+
+```bash
+# KMZファイルを使用してデータを分割
+python scripts/run_split.py --sites data/known/known_acre.kmz --train 0.7 --val 0.2 --test 0.1
+```
+
+#### 2. ハイパーパラメータ最適化
+
+```bash
+# Optuna + LLM統合による最適化を実行（50トライアル）
+python scripts/run_optuna.py --trials 50 --verbose
+```
+
+#### 3. 最良パラメータでの本実行 + 自動評価
+
+```bash
+# 最良パラメータで実行し、Inspector/Researcher分析も自動実行
+python scripts/run_best_params.py --params data/output/optuna/20250623_152052/best_params.json --run-analysis --verbose
+```
+
+**注意：** `--run-analysis` フラグを使用すると以下が自動実行されます：
+- ベストパラメータでの候補地点予測
+- Inspector Agent による評価分析  
+- Researcher Agent による改善提案
+
+#### 4. 個別分析（必要に応じて）
+
+```bash
+# Inspector Agent（評価分析）
+python scripts/run_inspector.py --candidates data/output/optuna/20250623_152052/best_run_val_candidates.csv --known data/known/known_acre.kmz
+
+# Researcher Agent（改善提案）
+python scripts/run_researcher.py --verbose
+```
+
+### 出力ディレクトリ構造
+
+最適化結果は以下の構造で保存されます：
+
+```
+data/output/optuna/
+├── 20250623_152052/              # タイムスタンプディレクトリ
+│   ├── best_params.json          # 最良パラメータ
+│   ├── best_run_val_candidates.csv       # バリデーション候補
+│   ├── best_run_test_time_candidates.csv # テスト候補
+│   └── trial_results.json        # 全トライアル結果
+├── 20250623_153045/              # 別実行の結果
+│   └── ...
+└── optuna.db                     # Optuna SQLite DB
+```
+
+### レガシー Jupyter Notebook
+
+従来の方法でも実行可能です：
 
 ```python
 # パッケージのインポート
 from tamagawa_to_z.harmonizer.harmonizer import HarmonizerPipeline
-from tamagawa_to_z.agents.agent_manager import AgentManager
-from tamagawa_to_z.hydro_da.hydraulics_da import HydraulicsDA
-from tamagawa_to_z.morph_da.morph_da import MorphologyDA
+from tamagawa_to_z.inspector_agent.metrics import AgentManager
 
 # 統合パイプラインの初期化
 pipeline = HarmonizerPipeline()
-agent_manager = AgentManager()
-hydro_da = HydraulicsDA()
-morph_da = MorphologyDA()
 
 # S-1: 対象地域のBBox定義と基本データ収集
 bbox = pipeline.make_bbox_gdf()
 toponyms = pipeline.collect_toponyms(bbox)
 
-# S-2: 多言語トポニム解析 & データ同化
-harmonized_data = pipeline.harmonize_toponyms(toponyms)
-hydro_results = hydro_da.simulate_flow_patterns(harmonized_data)
-morph_results = morph_da.analyze_landforms(harmonized_data)
-
-# S-3: マルチエージェント分析
-candidates = agent_manager.analyze_candidates(
-    harmonized_data, hydro_results, morph_results
-)
+# S-2: 候補地点のフィルタリング
+candidates = pipeline.filter_candidates(toponyms)
 
 # 結果の保存
-candidates.to_parquet("data/interim/acre_candidates.parquet")
-```
-
-### Pythonスクリプト
-
-CLI インターフェースを使用してコマンドラインから実行することも可能です：
-
-```bash
-# 基本実行
-tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5
-
-# エージェント並列実行
-tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5 --agents 4
-
-# データ同化シミュレーション有効化
-tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5 --enable-hydro-da --enable-morph-da
+candidates.to_csv("data/output/candidates.csv", index=False)
 ```
 
 ## プロジェクト構成
@@ -154,10 +183,21 @@ tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5 --enable-hydro-da --enable-morph-da
 ```
 tamagawa_to_z/
 ├── README.md           # このファイル
-├── LICENSE             # MITライセンス
+├── LICENSE             # MITライセンス  
 ├── pyproject.toml      # Poetry設定（Python 3.10以上が必要）
 ├── requirements.txt    # Kaggle用依存関係
 ├── .gitignore          # Git除外設定
+│
+├── scripts/            # CLI実行スクリプト（Hybrid-BO v2.0）
+│   ├── run_split.py       # データ分割（KMZ→train/val/test.gpkg）
+│   ├── run_optuna.py      # ハイパーパラメータ最適化
+│   ├── run_best_params.py # 最良パラメータ実行+自動評価
+│   ├── run_inspector.py   # Inspector Agent（評価分析）
+│   └── run_researcher.py  # Researcher Agent（改善提案）
+│
+├── configs/            # 設定ファイル
+│   ├── optuna_space.yaml  # 最適化パラメータ空間定義
+│   └── pipeline_config.yaml # パイプライン設定
 │
 ├── notebooks/          # 実験・可視化・デモ
 │   └── 99_kaggle_demo.ipynb  # Kaggleデモノートブック
@@ -171,16 +211,15 @@ tamagawa_to_z/
 │       │   ├── distance.py    # 距離計算
 │       │   ├── embed.py       # 埋め込み処理
 │       │   └── cluster.py     # クラスタリング
-│       ├── agents/            # マルチエージェントシステム
+│       ├── tuning/            # ハイパーパラメータ最適化
 │       │   ├── __init__.py
-│       │   ├── agent_manager.py  # エージェント管理
-│       │   └── agents.py         # エージェント実装
-│       ├── hydro_da/          # 水理データ同化
+│       │   ├── optuna_hybrid.py    # Optuna + LLM統合
+│       │   └── pipeline_runner.py  # パラメータ実行エンジン
+│       ├── inspector_agent/   # 評価・分析エージェント
 │       │   ├── __init__.py
-│       │   └── hydraulics_da.py  # 水理学的データ同化
-│       ├── morph_da/          # 地形データ同化
-│       │   ├── __init__.py
-│       │   └── morph_da.py       # 地形学的データ同化
+│       │   ├── inspector.py   # Inspector Agent実装
+│       │   ├── researcher.py  # Researcher Agent実装
+│       │   └── metrics.py     # 評価指標計算
 │       └── utils/             # ユーティリティ
 │           ├── __init__.py
 │           ├── geo.py         # 地理空間処理
@@ -193,10 +232,21 @@ tamagawa_to_z/
 │
 └── data/               # データ（Gitに含めない）
     ├── raw/            # 入力データ
-    │   ├── hydrorivers_sahydrorivers_sa/  # HydroRIVERS データ  
-    │   └── GSW_occurrence/                # Global Surface Water データ
-    └── interim/        # 中間データ
-        └── acre_candidates.parquet  # 候補地点
+    │   ├── HydroRIVERS_SA.shp      # HydroRIVERS データ
+    │   └── GSW_occurrence.tif      # Global Surface Water データ
+    ├── known/          # 既知サイトデータ
+    │   └── known_acre.kmz          # 訓練用既知サイト（KMZ形式）
+    ├── splits/         # データ分割結果
+    │   ├── train.gpkg  # 訓練データ
+    │   ├── val.gpkg    # バリデーションデータ
+    │   └── test.gpkg   # テストデータ
+    └── output/         # 出力結果
+        └── optuna/     # 最適化結果
+            ├── 20250623_152052/    # タイムスタンプディレクトリ
+            │   ├── best_params.json
+            │   ├── best_run_val_candidates.csv
+            │   └── best_run_test_time_candidates.csv
+            └── optuna.db           # Optuna SQLite DB
 ```
 
 ## データソース
@@ -212,6 +262,25 @@ tamagawa_to_z/
 [2]: https://wiki.openstreetmap.org/wiki/Overpass_API
 [3]: https://www.hydrosheds.org/
 [4]: https://global-surface-water.appspot.com/
+
+## 主要な変更履歴
+
+### v2.0 - Hybrid-BO 統合 (2025-06-23)
+
+- **CLI スクリプトの argparse 対応**: Typer から標準 argparse に変更し、通常のコマンドライン引数で使用可能
+- **タイムスタンプディレクトリ管理**: 実行結果を `data/output/optuna/{timestamp}/` 形式で整理
+- **自動評価チェーン**: `--run-analysis` フラグで Inspector/Researcher 分析を自動実行
+- **WKT 幾何形式対応**: CSV 出力で Shapely Point オブジェクトの代わりに WKT 文字列を使用
+- **KMZ 入力対応**: `.gpkg` の代わりに `.kmz` 形式のファイルを標準入力として採用
+- **train=0.0 時の自動削除**: 既存の train.gpkg ファイルを自動削除してクリーンな状態を維持
+
+#### 主要修正ファイル
+- `scripts/run_split.py`: Typer → argparse、KMZ デフォルト、train.gpkg 削除機能
+- `scripts/run_optuna.py`: Typer → argparse、タイムスタンプディレクトリ対応
+- `scripts/run_best_params.py`: Typer → argparse、自動評価チェーン実装
+- `src/tamagawa_to_z/tuning/pipeline_runner.py`: タイムスタンプディレクトリ自動作成、WKT 出力
+- `src/tamagawa_to_z/harmonizer/harmonizer.py`: 実装の non-mock 化
+- `src/tamagawa_to_z/inspector_agent/metrics.py`: WKT/GeoDataFrame 入力対応
 
 ## ライセンス
 

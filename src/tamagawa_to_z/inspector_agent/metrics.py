@@ -53,14 +53,14 @@ def _reproject_for_distance(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return gdf
 
 
-def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100) -> float:
+def recall_at_k(candidates, known: gpd.GeoDataFrame, k: int = 100) -> float:
     """Recall@K指標を計算する
     
     上位K件の候補の中に既知遺跡がどの程度含まれているかを計算します。
     
     Parameters
     ----------
-    candidates : pd.DataFrame
+    candidates : pd.DataFrame or gpd.GeoDataFrame
         候補データ（total_score列でソート済み想定）
     known : gpd.GeoDataFrame
         既知遺跡のGeoDataFrame
@@ -76,7 +76,10 @@ def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100)
         return 0.0
     
     # 候補をGeoDataFrameに変換
-    cand_gdf = _to_geodf(candidates)
+    if isinstance(candidates, gpd.GeoDataFrame):
+        cand_gdf = candidates
+    else:
+        cand_gdf = _to_geodf(candidates)
     
     # 上位K件を取得
     top_k = cand_gdf.nlargest(min(k, len(cand_gdf)), "total_score")
@@ -97,12 +100,12 @@ def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100)
     return len(matched) / len(known)
 
 
-def map_score(candidates: pd.DataFrame, known: gpd.GeoDataFrame) -> float:
+def map_score(candidates, known: gpd.GeoDataFrame) -> float:
     """Mean Average Precision (mAP) を計算する
     
     Parameters
     ----------
-    candidates : pd.DataFrame
+    candidates : pd.DataFrame or gpd.GeoDataFrame
         候補データ（total_score列でソート済み想定）
     known : gpd.GeoDataFrame
         既知遺跡のGeoDataFrame
@@ -116,7 +119,10 @@ def map_score(candidates: pd.DataFrame, known: gpd.GeoDataFrame) -> float:
         return 0.0
     
     # 候補をGeoDataFrameに変換
-    cand_gdf = _to_geodf(candidates)
+    if isinstance(candidates, gpd.GeoDataFrame):
+        cand_gdf = candidates
+    else:
+        cand_gdf = _to_geodf(candidates)
     
     # total_scoreで降順ソート
     cand_sorted = cand_gdf.sort_values("total_score", ascending=False).reset_index(drop=True)

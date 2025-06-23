@@ -1,0 +1,78 @@
+# Optuna 探索空間定義
+search_space:
+  distance_km:
+    type: "float"
+    low: 1.0
+    high: 5.0
+    log: false
+    
+  occ_pct:
+    type: "float"
+    low: 1.0
+    high: 10.0
+    log: false
+
+# BO 設定
+optimization:
+  direction: "maximize"
+  n_trials: 50
+  timeout: null  # 秒単位、nullで無制限
+  
+  # 早期停止
+  pruning:
+    enabled: true
+    n_startup_trials: 10
+    n_warmup_steps: 5
+    
+  # サンプラー設定
+  sampler:
+    type: "TPESampler"
+    multivariate: true
+    n_ei_candidates: 24
+    
+# データベース設定
+storage:
+  url: "sqlite:///data/output/optuna/optuna.db"
+  study_name: "tamagawa_hybrid_bo"
+  
+# 実験管理
+experiment:
+  cache_dir: ".llm_root_cache"
+  results_dir: "data/output/optuna"
+  
+# 評価関数の重み
+objective:
+  recall_weight: 0.6      # Recall@100 の重み
+  map_weight: 0.2         # Mean Average Precision の重み
+  workload_weight: -0.2   # 候補数ペナルティ（負の重み）
+  
+  # 評価設定
+  recall_k: 100
+  workload_scale: "log10"  # log10, linear, sqrt
+  
+# LLM 設定
+llm:
+  model: "gpt-4o-mini"
+  temperature: 0.0
+  max_tokens: 1000
+  cache_enabled: true
+  
+  # プロンプト設定
+  system_prompt: |
+    You are a geo-linguistics expert for Amazonian archaeology. 
+    Your task is to analyze toponyms and assign appropriate weights 
+    to linguistic roots based on their archaeological significance.
+    
+  user_prompt_template: |
+    Distance threshold = {distance_km} km, 
+    Water occurrence = {occ_pct} %.
+    Toponym stats: {toponym_stats}
+    Recent false positives: {false_pos}
+    
+    Return JSON with root weights in format: {{"weights": {{"root": float, ...}}}} with values 0.1-1.0
+    
+# ログ設定
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "data/output/optuna/optuna_hybrid.log"
