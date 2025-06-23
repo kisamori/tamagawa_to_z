@@ -4,11 +4,12 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/poetry-1.4.0+-blue.svg)](https://python-poetry.org/)
 
-アマゾン古河道・集落探索に向けた多言語トポニム解析フレームワーク
+アマゾン古河道・集落探索に向けた多言語トポニム × データ同化シミュレーション × マルチエージェントフレームワーク
 
 ## 概要
 
-tamagawa_to_z は、アマゾン流域における古河道や集落跡の探索を支援するためのフレームワークです。
+tamagawa_to_z は、アマゾン流域における古河道や集落跡の探索を支援するための統合フレームワークです。
+多言語トポニム解析、データ同化シミュレーション、マルチエージェントシステムを組み合わせ、
 地名データから水関連の地名を抽出・分類し、現河道との距離や水域頻度を分析することで、
 古河道候補地点を特定します。
 
@@ -100,33 +101,34 @@ pip install -r requirements.txt
 
 ### Jupyter Notebook
 
-`notebooks/01_harmonizer.ipynb` を使用して、アクレ州マデイラ川上流西部の水場系トポニムを抽出し、古河道候補地点を特定します。
+`notebooks/99_kaggle_demo.ipynb` を使用して、アマゾン流域の水場系トポニムを抽出し、データ同化シミュレーションとマルチエージェント分析により古河道候補地点を特定します。
 
 ```python
 # パッケージのインポート
-from tamagawa_to_z.harmonizer import (
-    make_bbox_gdf, collect_names, collect_osm_names, merge_toponyms, process_toponyms,
-    attach_distance, water_occurrence, filter_candidates, score_candidates
+from tamagawa_to_z.harmonizer.harmonizer import HarmonizerPipeline
+from tamagawa_to_z.agents.agent_manager import AgentManager
+from tamagawa_to_z.hydro_da.hydraulics_da import HydraulicsDA
+from tamagawa_to_z.morph_da.morph_da import MorphologyDA
+
+# 統合パイプラインの初期化
+pipeline = HarmonizerPipeline()
+agent_manager = AgentManager()
+hydro_da = HydraulicsDA()
+morph_da = MorphologyDA()
+
+# S-1: 対象地域のBBox定義と基本データ収集
+bbox = pipeline.make_bbox_gdf()
+toponyms = pipeline.collect_toponyms(bbox)
+
+# S-2: 多言語トポニム解析 & データ同化
+harmonized_data = pipeline.harmonize_toponyms(toponyms)
+hydro_results = hydro_da.simulate_flow_patterns(harmonized_data)
+morph_results = morph_da.analyze_landforms(harmonized_data)
+
+# S-3: マルチエージェント分析
+candidates = agent_manager.analyze_candidates(
+    harmonized_data, hydro_results, morph_results
 )
-
-# S-1: 対象地域のBBox定義
-bbox = make_bbox_gdf()
-
-# S-2: 水場系トポニムの抽出
-bngb_names = collect_names(bbox.geometry.iloc[0])
-osm_names = collect_osm_names(bbox.geometry.iloc[0])
-names = merge_toponyms(bngb_names, osm_names)
-
-# S-3: クレンジング & タイプ付け
-names = process_toponyms(names)
-
-# S-4: 現河道との距離計算
-names = attach_distance(names, "data/raw/HydroRIVERS_SA.shp")
-
-# S-5: "川が無いのに川名が残る"ポイント抽出
-names = water_occurrence(names, "data/raw/GSW_occurrence.tif")
-candidates = filter_candidates(names)
-candidates = score_candidates(candidates)
 
 # 結果の保存
 candidates.to_parquet("data/interim/acre_candidates.parquet")
@@ -134,11 +136,17 @@ candidates.to_parquet("data/interim/acre_candidates.parquet")
 
 ### Pythonスクリプト
 
-Notebook を使わずコマンドラインから実行する場合は `scripts/run_harmonizer.py`
-を利用します。BBOX を変更したい場合は `--bbox` オプションで緯度経度を指定します。
+CLI インターフェースを使用してコマンドラインから実行することも可能です：
 
 ```bash
-python scripts/run_harmonizer.py --bbox -70.5 -11.5 -66.5 -8.5
+# 基本実行
+tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5
+
+# エージェント並列実行
+tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5 --agents 4
+
+# データ同化シミュレーション有効化
+tamagawa_to_z --bbox -70.5 -11.5 -66.5 -8.5 --enable-hydro-da --enable-morph-da
 ```
 
 ## プロジェクト構成
@@ -152,27 +160,41 @@ tamagawa_to_z/
 ├── .gitignore          # Git除外設定
 │
 ├── notebooks/          # 実験・可視化・デモ
-│   └── 01_harmonizer.ipynb  # アクレ州パイプライン実行
+│   └── 99_kaggle_demo.ipynb  # Kaggleデモノートブック
 │
 ├── src/                # パッケージ本体
 │   └── tamagawa_to_z/
 │       ├── __init__.py
 │       ├── harmonizer/        # 多言語トポニム解析
 │       │   ├── __init__.py
-│       │   ├── preprocess.py  # S-1, S-2, S-3
-│       │   ├── distance.py    # S-4
-│       │   ├── watermask.py   # S-5 (GSW)
-│       │   └── agent.py       # S-5 (閾値判定)
+│       │   ├── harmonizer.py  # 主要処理
+│       │   ├── distance.py    # 距離計算
+│       │   ├── embed.py       # 埋め込み処理
+│       │   └── cluster.py     # クラスタリング
+│       ├── agents/            # マルチエージェントシステム
+│       │   ├── __init__.py
+│       │   ├── agent_manager.py  # エージェント管理
+│       │   └── agents.py         # エージェント実装
+│       ├── hydro_da/          # 水理データ同化
+│       │   ├── __init__.py
+│       │   └── hydraulics_da.py  # 水理学的データ同化
+│       ├── morph_da/          # 地形データ同化
+│       │   ├── __init__.py
+│       │   └── morph_da.py       # 地形学的データ同化
 │       └── utils/             # ユーティリティ
-│           └── __init__.py
+│           ├── __init__.py
+│           ├── geo.py         # 地理空間処理
+│           ├── io.py          # データ入出力
+│           ├── metrics.py     # 評価指標
+│           └── viz.py         # 可視化
 │
 ├── tests/              # テスト
 │   └── test_harmonizer.py
 │
 └── data/               # データ（Gitに含めない）
     ├── raw/            # 入力データ
-    │   ├── HydroRIVERS_SA.shp  # 南米河川ネットワーク
-    │   └── GSW_occurrence.tif  # 水域頻度
+    │   ├── hydrorivers_sahydrorivers_sa/  # HydroRIVERS データ  
+    │   └── GSW_occurrence/                # Global Surface Water データ
     └── interim/        # 中間データ
         └── acre_candidates.parquet  # 候補地点
 ```

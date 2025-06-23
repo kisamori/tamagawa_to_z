@@ -88,6 +88,7 @@ Thumbs.db
 /output/
 /logs/
 *.log
+/docs/archive/
 
 # DVC
 .dvc/
