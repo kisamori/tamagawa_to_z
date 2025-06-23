@@ -107,46 +107,60 @@ class ProposalGenerator:
         context = self._build_parameter_context()
         
         # Call LLM for parameter suggestions
-        prompt = f"""Based on the following performance analysis, suggest specific parameter adjustments:
+        prompt = f"""以下の性能分析に基づいて、具体的なパラメータ調整を提案してください：
 
 {context}
 
-Current Performance:
-- Workload: {workload} candidates
+現在の性能:
+- 処理負荷: {workload} 候補
 - Recall@100: {recall:.3f}
-- Root diversity: {baseline_metrics.get('root_diversity', 2.0):.2f}
+- 語根多様性: {baseline_metrics.get('root_diversity', 2.0):.2f}
 
-Failure patterns identified: {len(self.failure_clusters)} clusters
+特定された失敗パターン: {len(self.failure_clusters)} クラスター
 
-Please suggest 1-2 specific parameter changes that would improve recall while managing workload.
-Focus on distance thresholds, frequency thresholds, or weight adjustments.
+処理負荷を管理しながらrecallを改善する具体的なパラメータ変更を1-2個提案してください。
+距離閾値、頻度閾値、または重み調整に焦点を当ててください。
 
-Respond in this JSON format:
+以下のJSON形式で回答してください：
 {{
-    "title": "Brief descriptive title",
+    "title": "簡潔な説明タイトル",
     "parameters": {{
         "parameter_name": new_value
     }},
-    "rationale": "Why this change will help",
+    "rationale": "この変更が役立つ理由",
     "expected_recall_change": "+X%",
     "expected_workload_change": "+/-N",
-    "risk": "Main risk or concern",
-    "effort": "★☆☆ (easy) / ★★☆ (medium) / ★★★ (hard)"
+    "risk": "主なリスクや懸念",
+    "effort": "★☆☆ (簡単) / ★★☆ (中程度) / ★★★ (困難)"
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in geospatial parameter optimization for archaeological site detection."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3
+            # Responses APIでの実行
+            full_input = f"あなたは考古学遺跡検出のための地理空間パラメータ最適化の専門家です。\n\n{prompt}"
+            response = self.client.responses.create(
+                model="o3-pro",
+                input=full_input
             )
             
-            # Parse JSON response
-            response_text = response.choices[0].message.content
+            # レスポンス内容を取得
+            response_text = ""
+            if hasattr(response, 'output_text'):
+                response_text = response.output_text
+            elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+                response_text = response.output.text
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            elif hasattr(response, 'choices') and response.choices:
+                response_text = response.choices[0].message.content
+            else:
+                response_text = str(response)
+            
             # Extract JSON from response (handle markdown code blocks)
+            if not response_text or not hasattr(response_text, 'strip') or response_text.strip() == "":
+                return []
+                
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:
@@ -154,6 +168,9 @@ Respond in this JSON format:
             else:
                 json_part = response_text
             
+            if not json_part or not hasattr(json_part, 'strip') or not json_part.strip():
+                return []
+                
             data = json.loads(json_part)
             
             # Build changes list
@@ -187,43 +204,59 @@ Respond in this JSON format:
         # Analyze code snippets for improvement opportunities
         code_context = self._build_code_context()
         
-        prompt = f"""Analyze the following code snippets from a toponym harmonization system and suggest improvements:
+        prompt = f"""地名調和システムから以下のコードスニペットを分析し、改善提案を行ってください：
 
 {code_context}
 
-The system extracts water-related toponyms and harmonizes them for archaeological site detection.
+このシステムは水関連の地名を抽出し、考古学遺跡検出のために調和を図ります。
 
-Common issues:
-- LLM hallucination in toponym classification
-- Inconsistent root detection
-- Poor handling of multilingual place names
+一般的な問題:
+- 地名分類におけるLLMの幻覚
+- 語根検出の不一致
+- 多言語地名の処理不備
 
-Suggest ONE specific improvement to prompts, code logic, or processing steps.
+プロンプト、コードロジック、または処理ステップの具体的な改善を1つ提案してください。
 
-Respond in this JSON format:
+以下のJSON形式で回答してください：
 {{
-    "title": "Brief improvement description",
+    "title": "改善の簡潔な説明",
     "target": "harmonizer.llm_layer.harmonize",
     "change_type": "modify_prompt",
-    "improvement": "Specific change description",
-    "rationale": "Why this will improve results",
+    "improvement": "具体的な変更の説明",
+    "rationale": "この改善が結果を向上させる理由",
     "expected_map_change": "+X%",
-    "expected_cost_change": "+X% API costs",
-    "risk": "Main implementation risk",
+    "expected_cost_change": "+X% APIコスト",
+    "risk": "主な実装リスク",
     "effort": "★☆☆ / ★★☆ / ★★★"
 }}"""
         
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert in NLP pipeline optimization and prompt engineering."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.4
+            # Responses APIでの実行
+            full_input = f"あなたはNLPパイプライン最適化とプロンプトエンジニアリングの専門家です。\n\n{prompt}"
+            response = self.client.responses.create(
+                model="o3",
+                input=full_input
             )
             
-            response_text = response.choices[0].message.content
+            # レスポンス内容を取得
+            response_text = ""
+            if hasattr(response, 'output_text'):
+                response_text = response.output_text
+            elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+                response_text = response.output.text
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            elif hasattr(response, 'choices') and response.choices:
+                response_text = response.choices[0].message.content
+            else:
+                response_text = str(response)
+            
+            # Extract JSON from response (handle markdown code blocks)
+            if not response_text or not hasattr(response_text, 'strip') or response_text.strip() == "":
+                return []
+                
             if '```json' in response_text:
                 json_part = response_text.split('```json')[1].split('```')[0]
             elif '{' in response_text:
@@ -231,6 +264,9 @@ Respond in this JSON format:
             else:
                 json_part = response_text
             
+            if not json_part or not hasattr(json_part, 'strip') or not json_part.strip():
+                return []
+                
             data = json.loads(json_part)
             
             # Build changes

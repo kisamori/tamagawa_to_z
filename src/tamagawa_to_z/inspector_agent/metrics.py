@@ -34,6 +34,25 @@ def _to_geodf(df: pd.DataFrame) -> gpd.GeoDataFrame:
     )
 
 
+def _reproject_for_distance(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """距離計算用に適切な投影座標系に変換する
+    
+    Parameters
+    ----------
+    gdf : gpd.GeoDataFrame
+        地理座標系のGeoDataFrame
+        
+    Returns
+    -------
+    gpd.GeoDataFrame
+        投影座標系に変換されたGeoDataFrame
+    """
+    if gdf.crs and gdf.crs.is_geographic:
+        # アマゾン地域用のUTM座標系を使用 (Zone 21S for most of Amazon basin)
+        return gdf.to_crs("EPSG:32721")  # UTM Zone 21S
+    return gdf
+
+
 def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100) -> float:
     """Recall@K指標を計算する
     
@@ -62,10 +81,14 @@ def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100)
     # 上位K件を取得
     top_k = cand_gdf.nlargest(min(k, len(cand_gdf)), "total_score")
     
+    # 距離計算用に投影座標系に変換
+    known_proj = _reproject_for_distance(known)
+    top_k_proj = _reproject_for_distance(top_k)
+    
     # 既知遺跡との最近傍結合（100m以内）
     matched = gpd.sjoin_nearest(
-        known, 
-        top_k, 
+        known_proj, 
+        top_k_proj, 
         how="inner", 
         max_distance=100  # 100m以内
     )
@@ -98,16 +121,20 @@ def map_score(candidates: pd.DataFrame, known: gpd.GeoDataFrame) -> float:
     # total_scoreで降順ソート
     cand_sorted = cand_gdf.sort_values("total_score", ascending=False).reset_index(drop=True)
     
+    # 距離計算用に投影座標系に変換
+    known_proj = _reproject_for_distance(known)
+    cand_sorted_proj = _reproject_for_distance(cand_sorted)
+    
     # 各候補について既知遺跡との距離を計算
     precisions = []
     tp_count = 0
     
-    for i, candidate in cand_sorted.iterrows():
+    for i, candidate in cand_sorted_proj.iterrows():
         # 候補点から100m以内に既知遺跡があるかチェック
         candidate_point = candidate.geometry
         is_hit = any(
-            candidate_point.distance(known_site.geometry) <= 0.001  # 約100m（度単位）
-            for _, known_site in known.iterrows()
+            candidate_point.distance(known_site.geometry) <= 100  # 100m（メートル単位）
+            for _, known_site in known_proj.iterrows()
         )
         
         if is_hit:

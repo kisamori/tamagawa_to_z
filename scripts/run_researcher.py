@@ -31,7 +31,36 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+# .envファイルを読み込み
+try:
+    from dotenv import load_dotenv
+    load_dotenv(project_root / ".env")
+except ImportError:
+    # python-dotenvがインストールされていない場合はスキップ
+    pass
+
 from tamagawa_to_z.researcher_agent import run
+
+
+def get_latest_inspector_report_dir():
+    """最新のinspector reportディレクトリのパスを取得する"""
+    base_dir = Path("/Users/kisamorikeiichi/Development/tamagawa_to_z/data/output/inspector_reports")
+    
+    if not base_dir.exists():
+        return None
+    
+    # タイムスタンプ付きディレクトリを探す
+    timestamp_dirs = []
+    for item in base_dir.iterdir():
+        if item.is_dir() and any(char.isdigit() for char in item.name):
+            timestamp_dirs.append(item)
+    
+    if timestamp_dirs:
+        # 最新の（最後に変更された）ディレクトリを返す
+        latest_dir = max(timestamp_dirs, key=lambda p: p.stat().st_mtime)
+        return str(latest_dir)
+    
+    return None
 
 
 def parse_arguments():
@@ -42,11 +71,12 @@ def parse_arguments():
         epilog=__doc__
     )
     
-    # 必須引数
+    # オプション引数（デフォルトで最新のディレクトリを使用）
+    default_artefacts = get_latest_inspector_report_dir()
     parser.add_argument(
         "--artefacts",
-        required=True,
-        help="IA出力とデータファイルのディレクトリパス"
+        default=default_artefacts,
+        help=f"IA出力とデータファイルのディレクトリパス（デフォルト: 最新のタイムスタンプディレクトリ）"
     )
     
     parser.add_argument(
@@ -63,7 +93,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--api-key",
-        help="OpenAI APIキー（環境変数OPENAI_API_KEYからも読み込み可能）"
+        help="OpenAI APIキー（環境変数OPENAI_API_KEY_TIRE5からも読み込み可能）"
     )
     
     parser.add_argument(
@@ -80,7 +110,9 @@ def validate_inputs(args):
     errors = []
     
     # アーティファクトディレクトリの確認
-    if not os.path.exists(args.artefacts):
+    if args.artefacts is None:
+        errors.append("アーティファクトディレクトリが見つかりません。inspector_reportsディレクトリにタイムスタンプ付きディレクトリが存在することを確認してください。")
+    elif not os.path.exists(args.artefacts):
         errors.append(f"アーティファクトディレクトリが見つかりません: {args.artefacts}")
     elif not os.path.isdir(args.artefacts):
         errors.append(f"アーティファクトパスはディレクトリである必要があります: {args.artefacts}")
@@ -90,9 +122,9 @@ def validate_inputs(args):
         errors.append(f"設定ファイルが見つかりません: {args.config}")
     
     # OpenAI APIキーの確認
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY_TIRE5")
     if not api_key:
-        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEYを設定してください。")
+        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEY_TIRE5を設定してください。")
     
     if errors:
         print("❌ 入力エラー:")
@@ -152,8 +184,8 @@ def main():
     
     try:
         # 環境変数の設定（必要に応じて）
-        if api_key and not os.getenv("OPENAI_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = api_key
+        if api_key and not os.getenv("OPENAI_API_KEY_TIRE5"):
+            os.environ["OPENAI_API_KEY_TIRE5"] = api_key
         
         # Researcher Agent の実行
         print("🧠 分析を開始しています...")

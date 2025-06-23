@@ -161,7 +161,7 @@ def run(artefact_dir: str,
         (report_path, yaml_path)
     """
     # Setup OpenAI client
-    client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY_TIRE5"))
     
     # Load configuration
     if config_path and Path(config_path).exists():
@@ -177,7 +177,7 @@ def run(artefact_dir: str,
                 "cost": 0.2
             },
             "max_proposals": 3,
-            "llm_model": "gpt-4",
+            "llm_model": "o3-pro",
             "temperature": 0.3
         }
     

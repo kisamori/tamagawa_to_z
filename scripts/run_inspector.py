@@ -6,19 +6,17 @@
 
 Usage:
     python scripts/run_inspector.py --candidates data/interim/acre_candidates.csv \\
-                                   --known data/raw/known_sites.gpkg \\
                                    --output data/output/inspector_reports
 
 Example:
     # 基本実行
     python scripts/run_inspector.py \\
         --candidates data/interim/acre_candidates.csv \\
-        --known data/raw/known_sites.gpkg
 
     # メタ情報と辞書を含む実行
     python scripts/run_inspector.py \\
         --candidates data/interim/acre_candidates.csv \\
-        --known data/raw/known_sites.gpkg \\
+        --known data/known/known_acre.kmz \\
         --meta config/run_meta.yaml \\
         --dict data/dict/toponym_dict.csv \\
         --output reports/
@@ -32,6 +30,14 @@ from pathlib import Path
 # プロジェクトルートをPythonパスに追加
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
+
+# .envファイルを読み込み
+try:
+    from dotenv import load_dotenv
+    load_dotenv(project_root / ".env")
+except ImportError:
+    # python-dotenvがインストールされていない場合はスキップ
+    pass
 
 from tamagawa_to_z.inspector_agent import run
 
@@ -53,8 +59,8 @@ def parse_arguments():
     
     parser.add_argument(
         "--known",
-        required=True,
-        help="既知遺跡データのファイルパス（.gpkg, .shp等のGISファイル）"
+        default="data/known/known_acre.kmz",
+        help="既知遺跡データのファイルパス（.gpkg, .shp, .kmz等のGISファイル）"
     )
     
     # オプション引数
@@ -76,7 +82,7 @@ def parse_arguments():
     
     parser.add_argument(
         "--api-key",
-        help="OpenAI APIキー（環境変数OPENAI_API_KEYからも読み込み可能）"
+        help="OpenAI APIキー（環境変数OPENAI_API_KEY_TIRE5からも読み込み可能）"
     )
     
     parser.add_argument(
@@ -101,8 +107,8 @@ def validate_inputs(args):
     # 既知遺跡データファイルの確認
     if not os.path.exists(args.known):
         errors.append(f"既知遺跡データファイルが見つかりません: {args.known}")
-    elif not any(args.known.endswith(ext) for ext in ['.gpkg', '.shp', '.geojson']):
-        errors.append(f"既知遺跡データファイルはGIS形式（.gpkg, .shp, .geojson）である必要があります: {args.known}")
+    elif not any(args.known.endswith(ext) for ext in ['.gpkg', '.shp', '.geojson', '.kmz']):
+        errors.append(f"既知遺跡データファイルはGIS形式（.gpkg, .shp, .geojson, .kmz）である必要があります: {args.known}")
     
     # メタファイルの確認（オプション）
     if args.meta and not os.path.exists(args.meta):
@@ -113,9 +119,9 @@ def validate_inputs(args):
         errors.append(f"辞書ファイルが見つかりません: {args.dict}")
     
     # OpenAI APIキーの確認
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY_TIRE5")
     if not api_key:
-        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEYを設定してください。")
+        errors.append("OpenAI APIキーが設定されていません。--api-key引数か環境変数OPENAI_API_KEY_TIRE5を設定してください。")
     
     if errors:
         print("❌ 入力エラー:")
@@ -147,8 +153,8 @@ def main():
     
     try:
         # 環境変数の設定（必要に応じて）
-        if api_key and not os.getenv("OPENAI_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = api_key
+        if api_key and not os.getenv("OPENAI_API_KEY_TIRE5"):
+            os.environ["OPENAI_API_KEY_TIRE5"] = api_key
         
         # Inspector-Validator Agent の実行
         print("📊 データ分析を開始しています...")

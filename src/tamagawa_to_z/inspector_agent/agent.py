@@ -8,6 +8,8 @@ import json
 import os
 import pathlib
 import uuid
+import zipfile
+import tempfile
 from datetime import datetime
 from typing import Dict, Optional, Any
 
@@ -17,7 +19,7 @@ import yaml
 from jinja2 import Template
 from openai import OpenAI
 
-from .agent_schema import PROPOSE_SCHEMA, DIAGNOSE_SCHEMA, validate_action_params
+from .agent_schema import PROPOSE_SCHEMA, DIAGNOSE_SCHEMA, validate_action_params, create_tools_config
 from .metrics import calculate_all_metrics, analyze_spatial_distribution
 
 
@@ -35,16 +37,14 @@ class InspectorValidatorAgent:
         api_key : Optional[str]
             OpenAI API キー（環境変数OPENAI_API_KEYからも読み込み可能）
         """
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY_TIRE5"))
         self.assistant = None
         self._create_assistant()
     
     def _create_assistant(self):
-        """OpenAI Assistant を作成する"""
-        self.assistant = self.client.beta.assistants.create(
-            name="InspectorValidator",
-            model="gpt-4o",
-            instructions="""あなたは多言語トポニム解析システムのInspector-Validator Agentです。
+        """システム指示を準備する"""
+        # システム指示を保存
+        self.system_instructions = """あなたは多言語トポニム解析システムのInspector-Validator Agentです。
 
 あなたの役割：
 1. 候補抽出結果のメトリクス（Recall@K, mAP, workload等）を分析
@@ -62,12 +62,7 @@ class InspectorValidatorAgent:
 2. add_exclude_mask: 除外マスクの追加（都市部、保護区域等）
 3. add_root_weight: 語根重み調整（igarapé、lagoa等の重要語彙）
 
-必ず具体的で実行可能な改善案を1件提案してください。""",
-            tools=[
-                {"type": "function", "function": PROPOSE_SCHEMA},
-                {"type": "function", "function": DIAGNOSE_SCHEMA}
-            ]
-        )
+必ず具体的で実行可能な改善案を1件提案してください。"""
     
     def _build_analysis_prompt(self, metrics: Dict[str, float], 
                               spatial_stats: Dict[str, float],
@@ -146,7 +141,12 @@ class InspectorValidatorAgent:
         # geometry列を文字列として明示的に扱う
         if 'geometry' in candidates.columns:
             candidates['geometry'] = candidates['geometry'].astype(str)
-        known_sites = gpd.read_file(known_sites_path)
+        
+        # 既知サイトの読み込み（KMZ対応）
+        if known_sites_path.endswith('.kmz'):
+            known_sites = self._load_kmz_file(known_sites_path)
+        else:
+            known_sites = gpd.read_file(known_sites_path)
         
         # メタ情報の読み込み
         meta_info = {}
@@ -166,27 +166,24 @@ class InspectorValidatorAgent:
         # 分析プロンプトの構築
         prompt = self._build_analysis_prompt(metrics, spatial_stats, meta_info)
         
-        # OpenAI Assistant による分析
-        thread = self.client.beta.threads.create()
-        self.client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=prompt
-        )
-        
-        # 実行と結果取得
-        run = self.client.beta.threads.runs.create_and_poll(
-            thread_id=thread.id,
-            assistant_id=self.assistant.id
+        # Responses API による分析
+        full_input = f"{self.system_instructions}\n\n{prompt}"
+        response = self.client.responses.create(
+            model="o3-pro",
+            input=full_input,
+            tools=[
+                {"type": "function", "name": "diagnose_results", "function": DIAGNOSE_SCHEMA},
+                {"type": "function", "name": "propose_action", "function": PROPOSE_SCHEMA}
+            ]
         )
         
         # 結果の処理
         diagnosis = None
         proposal = None
         
-        if run.status == "requires_action":
+        if hasattr(response, 'tool_calls') and response.tool_calls:
             # Function callの結果を処理
-            for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+            for tool_call in response.tool_calls:
                 if tool_call.function.name == "diagnose_results":
                     diagnosis = json.loads(tool_call.function.arguments)
                 elif tool_call.function.name == "propose_action":
@@ -331,6 +328,60 @@ class InspectorValidatorAgent:
             report += "```\n"
         
         return report
+    
+    def _load_kmz_file(self, kmz_path: str) -> 'gpd.GeoDataFrame':
+        """KMZファイルを読み込む"""
+        import geopandas as gpd
+        from pathlib import Path
+        from xml.etree import ElementTree as ET
+        from shapely.geometry import Point
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # KMZファイルを展開
+            with zipfile.ZipFile(kmz_path, 'r') as kmz:
+                kml_files = [name for name in kmz.namelist() if name.endswith('.kml')]
+                if not kml_files:
+                    raise ValueError(f"No KML files found in KMZ: {kmz_path}")
+                
+                # 最初のKMLファイルを展開
+                kml_filename = kml_files[0]
+                kml_content = kmz.read(kml_filename).decode('utf-8')
+        
+        # XMLを解析
+        root = ET.fromstring(kml_content)
+        
+        # 名前空間の定義
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+        
+        data = []
+        # Placemarkを探して処理
+        placemarks = root.findall('.//kml:Placemark', ns)
+        
+        for placemark in placemarks:
+            # 場所名を取得
+            name_element = placemark.find('kml:name', ns)
+            place_name = name_element.text if name_element is not None else ''
+            
+            # 座標を取得
+            coordinates_element = placemark.find('.//kml:coordinates', ns)
+            if coordinates_element is not None:
+                coords_text = coordinates_element.text.strip()
+                coords_parts = coords_text.split(',')
+                if len(coords_parts) >= 2:
+                    try:
+                        longitude = float(coords_parts[0])
+                        latitude = float(coords_parts[1])
+                        
+                        data.append({
+                            'name': place_name,
+                            'geometry': Point(longitude, latitude)
+                        })
+                    except ValueError:
+                        continue
+        
+        return gpd.GeoDataFrame(data, crs='EPSG:4326')
 
 
 def run(candidates_path: str, 
