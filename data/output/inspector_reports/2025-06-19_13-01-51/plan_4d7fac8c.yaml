@@ -1,7 +1,0 @@
-action: add_root_weight
-expected_improvement: 地域特有の地名に対する検出精度の向上と、地名データの多様性の改善が期待されます。
-params:
-  root: igarapé
-  weight: 2
-priority: high
-rationale: アマゾン地域に特有の語根である'igarapé'に重み付けを行うことで、地域特有の地名データの検出能力が向上することを期待しています。

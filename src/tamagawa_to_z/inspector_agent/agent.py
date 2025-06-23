@@ -106,12 +106,12 @@ class InspectorValidatorAgent:
         
         prompt += """
 ## 分析タスク
-上記のメトリクスを分析し、以下を実行してください：
+上記のメトリクスを分析し、以下を必ず両方実行してください：
 
-1. diagnose_results関数で問題点を特定・分析
-2. propose_action関数で具体的な改善アクションを1件提案
+1. まず diagnose_results 関数を呼び出して問題点を特定・分析
+2. 次に propose_action 関数を呼び出して具体的な改善アクションを1件提案
 
-アマゾン地域の地理的・言語的特性を考慮し、実用的で効果的な改善提案を行ってください。
+重要：両方の関数を必ず呼び出してください。アマゾン地域の地理的・言語的特性を考慮し、実用的で効果的な改善提案を行ってください。
 """
         
         return prompt
@@ -170,24 +170,27 @@ class InspectorValidatorAgent:
         full_input = f"{self.system_instructions}\n\n{prompt}"
         response = self.client.responses.create(
             model="o3-pro",
-            input=full_input,
+            input=[{"role": "user", "content": full_input}],
             tools=[
-                {"type": "function", "name": "diagnose_results", "function": DIAGNOSE_SCHEMA},
-                {"type": "function", "name": "propose_action", "function": PROPOSE_SCHEMA}
-            ]
+                {"type": "function", "name": "diagnose_results", **DIAGNOSE_SCHEMA},
+                {"type": "function", "name": "propose_action", **PROPOSE_SCHEMA}
+            ],
+            tool_choice="required"
         )
         
         # 結果の処理
         diagnosis = None
         proposal = None
         
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            # Function callの結果を処理
-            for tool_call in response.tool_calls:
-                if tool_call.function.name == "diagnose_results":
-                    diagnosis = json.loads(tool_call.function.arguments)
-                elif tool_call.function.name == "propose_action":
-                    proposal = json.loads(tool_call.function.arguments)
+        # Responses APIの正しい構造でoutputを処理
+        for output_item in response.output:
+            if hasattr(output_item, 'type') and output_item.type == 'function_call':
+                # ResponseFunctionToolCall の処理
+                if hasattr(output_item, 'name') and hasattr(output_item, 'arguments'):
+                    if output_item.name == "diagnose_results":
+                        diagnosis = json.loads(output_item.arguments)
+                    elif output_item.name == "propose_action":
+                        proposal = json.loads(output_item.arguments)
         
         # 結果の統合
         results = {

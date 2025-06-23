@@ -5,17 +5,17 @@
 改善提案を行うInspector-Validator Agentを実行します。
 
 Usage:
-    python scripts/run_inspector.py --candidates data/interim/acre_candidates.csv \\
+    python scripts/run_inspector.py --candidates data/output/candidates/acre_candidates.csv \\
                                    --output data/output/inspector_reports
 
 Example:
     # 基本実行
     python scripts/run_inspector.py \\
-        --candidates data/interim/acre_candidates.csv \\
+        --candidates data/output/candidates/acre_candidates.csv \\
 
     # メタ情報と辞書を含む実行
     python scripts/run_inspector.py \\
-        --candidates data/interim/acre_candidates.csv \\
+        --candidates data/output/candidates/acre_candidates.csv \\
         --known data/known/known_acre.kmz \\
         --meta config/run_meta.yaml \\
         --dict data/dict/toponym_dict.csv \\

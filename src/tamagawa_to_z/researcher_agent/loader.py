@@ -113,7 +113,7 @@ class ArtefactLoader:
                 print(f"Warning: Could not load {path}: {e}")
         
         # Return empty DataFrame if no file found
-        default_path = self.config.get('default_paths', {}).get('candidates', 'data/interim/region_candidates.csv')
+        default_path = self.config.get('default_paths', {}).get('candidates', 'data/output/candidates/region_candidates.csv')
         print(f"Warning: No candidates CSV file found. Expected: {default_path}")
         return pd.DataFrame()
     
@@ -403,6 +403,7 @@ class ArtefactLoader:
         # 3. Search in project standard directories
         if self.project_root:
             search_dirs = [
+                self.project_root / "data" / "output" / "candidates",
                 self.project_root / "data" / "interim",
                 self.project_root / "data" / "raw", 
                 self.project_root / "data" / "dict",

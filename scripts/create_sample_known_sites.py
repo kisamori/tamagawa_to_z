@@ -152,7 +152,7 @@ def create_run_metadata(output_path: str, region: str = "Acre, Brazil"):
 def main():
     """メイン実行関数"""
     # ファイルパスの設定
-    candidates_path = "data/interim/acre_candidates.csv"
+    candidates_path = "data/output/candidates/acre_candidates.csv"
     known_sites_path = "data/raw/known_sites.gpkg"
     metadata_path = "config/run_meta.yaml"
     

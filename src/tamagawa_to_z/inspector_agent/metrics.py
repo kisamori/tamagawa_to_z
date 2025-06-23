@@ -85,12 +85,12 @@ def recall_at_k(candidates: pd.DataFrame, known: gpd.GeoDataFrame, k: int = 100)
     known_proj = _reproject_for_distance(known)
     top_k_proj = _reproject_for_distance(top_k)
     
-    # 既知遺跡との最近傍結合（100m以内）
+    # 既知遺跡との最近傍結合（500m以内）
     matched = gpd.sjoin_nearest(
         known_proj, 
         top_k_proj, 
         how="inner", 
-        max_distance=100  # 100m以内
+        max_distance=500  # 500m以内
     )
     
     # Recall@K = マッチした既知遺跡数 / 全既知遺跡数
@@ -130,10 +130,10 @@ def map_score(candidates: pd.DataFrame, known: gpd.GeoDataFrame) -> float:
     tp_count = 0
     
     for i, candidate in cand_sorted_proj.iterrows():
-        # 候補点から100m以内に既知遺跡があるかチェック
+        # 候補点から500m以内に既知遺跡があるかチェック
         candidate_point = candidate.geometry
         is_hit = any(
-            candidate_point.distance(known_site.geometry) <= 100  # 100m（メートル単位）
+            candidate_point.distance(known_site.geometry) <= 500  # 500m（メートル単位）
             for _, known_site in known_proj.iterrows()
         )
         
@@ -199,7 +199,7 @@ def root_diversity(candidates: pd.DataFrame, root_column: str = "root") -> float
 def calculate_all_metrics(
     candidates: pd.DataFrame, 
     known: gpd.GeoDataFrame,
-    k_values: List[int] = [50, 100, 300]
+    k_values: List[int] = [5, 10, 20, 50, 100]
 ) -> Dict[str, float]:
     """全ての評価指標を一括計算する
     

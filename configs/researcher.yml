@@ -34,7 +34,7 @@ code_extraction:
 
 # Default file paths for data loading
 default_paths:
-  candidates: "data/interim/region_candidates.csv"
+  candidates: "data/output/candidates/region_candidates.csv"
   toponym_dict: "data/dict/toponym_dict.csv"
   known_sites: "data/known/known_acre.kmz"
   param_yaml: "config/run_meta.yaml"
