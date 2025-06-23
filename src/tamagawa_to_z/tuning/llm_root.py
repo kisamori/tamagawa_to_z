@@ -169,14 +169,16 @@ def _generate_cache_key(
     temperature: float
 ) -> str:
     """コンテキストからキャッシュキーを生成する."""
-    # 決定論的なキーを作るため、辞書をソートしてシリアライズ
-    cache_data = {
-        "context": context,
-        "model": model, 
+    # 履歴ハッシュを含む主要な要素でキーを生成
+    key_components = {
+        "D": context.get("distance_km"),
+        "O": context.get("occ_pct"),
+        "H": context.get("history_hash"),
+        "model": model,
         "temperature": temperature
     }
     
-    serialized = json.dumps(cache_data, sort_keys=True, ensure_ascii=False)
+    serialized = json.dumps(key_components, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
 
