@@ -108,7 +108,7 @@ class DataSplitter:
     
     def _simple_ratio_split(self) -> Dict[str, Union[gpd.GeoDataFrame, Dict[str, gpd.GeoDataFrame]]]:
         """
-        シンプルな比率ベースの分割.
+        シンプルな比率ベースの分割（発見年フィルタ対応）.
         
         Returns:
             分割結果辞書
@@ -126,8 +126,11 @@ class DataSplitter:
             val_ratio /= total_ratio
             test_ratio /= total_ratio
         
+        # 発見年フィルタを適用
+        filtered_sites = self._apply_discovery_year_filters(self.sites)
+        
         # 全データをシャッフル
-        shuffled_sites = self.sites.sample(frac=1, random_state=self.cfg.get("random_state", 42)).reset_index(drop=True)
+        shuffled_sites = filtered_sites.sample(frac=1, random_state=self.cfg.get("random_state", 42)).reset_index(drop=True)
         
         total_sites = len(shuffled_sites)
         train_size = int(total_sites * train_ratio)
@@ -139,12 +142,18 @@ class DataSplitter:
         
         if train_ratio > 0:
             train_gdf = shuffled_sites[:train_size].copy()
+            # Trainセットに追加フィルタを適用
+            train_gdf = self._apply_dataset_specific_filters(train_gdf, "train")
             result["train"] = train_gdf
         else:
             train_size = 0  # trainが0%の場合
             
         val_gdf = shuffled_sites[train_size:train_size + val_size].copy()
         test_gdf = shuffled_sites[train_size + val_size:].copy()
+        
+        # 各セットに追加フィルタを適用
+        val_gdf = self._apply_dataset_specific_filters(val_gdf, "val")
+        test_gdf = self._apply_dataset_specific_filters(test_gdf, "test")
         
         result["val"] = val_gdf
         result["test"] = test_gdf
@@ -509,6 +518,59 @@ class DataSplitter:
                 logger.warning(f"No sites found for culture: {culture_tag}")
                 
         return test_region_dict
+    
+    def _apply_discovery_year_filters(self, sites: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        全体的な発見年フィルタを適用（現在は使用しない、将来のため保持）.
+        
+        Args:
+            sites: 元の遺跡データ
+            
+        Returns:
+            フィルタ後の遺跡データ
+        """
+        # 現在は何もしない（条件設定されていない場合のデフォルト動作）
+        return sites
+    
+    def _apply_dataset_specific_filters(self, sites: gpd.GeoDataFrame, dataset_type: str) -> gpd.GeoDataFrame:
+        """
+        データセット別の発見年フィルタを適用.
+        
+        Args:
+            sites: 分割後の遺跡データ
+            dataset_type: "train", "val", "test"のいずれか
+            
+        Returns:
+            フィルタ後の遺跡データ
+        """
+        if "discovery_year_filters" not in self.cfg:
+            # フィルタ設定がない場合はそのまま返す
+            return sites
+        
+        filters = self.cfg["discovery_year_filters"]
+        min_key = f"{dataset_type}_discovery_year_min"
+        max_key = f"{dataset_type}_discovery_year_max"
+        
+        filtered_sites = sites.copy()
+        original_count = len(filtered_sites)
+        
+        # 最小年でフィルタ
+        if min_key in filters and filters[min_key] is not None:
+            min_year = filters[min_key]
+            filtered_sites = filtered_sites[filtered_sites["discovery_year"] >= min_year]
+            logger.debug(f"{dataset_type}: discovery_year >= {min_year} filter applied")
+        
+        # 最大年でフィルタ  
+        if max_key in filters and filters[max_key] is not None:
+            max_year = filters[max_key]
+            filtered_sites = filtered_sites[filtered_sites["discovery_year"] <= max_year]
+            logger.debug(f"{dataset_type}: discovery_year <= {max_year} filter applied")
+        
+        filtered_count = len(filtered_sites)
+        if filtered_count != original_count:
+            logger.info(f"{dataset_type}: discovery year filter: {original_count} → {filtered_count} sites")
+        
+        return filtered_sites.reset_index(drop=True)
 
 
 def create_sample_master_csv(output_path: Path) -> None:

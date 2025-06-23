@@ -16,6 +16,7 @@ import geopandas as gpd
 
 from .llm_root import get_root_weights
 from .pipeline_runner import run_pipeline_with_params
+from .history_summarizer import HistorySummarizer
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,9 @@ class HybridBO:
         
         # False Positive ログ
         self.fp_log: List[str] = []
+        
+        # History Summarizer
+        self.summarizer = HistorySummarizer()
         
         # タイムスタンプディレクトリを作成
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -187,12 +191,16 @@ class HybridBO:
             log=search_space["occ_pct"].get("log", False)
         )
         
+        # 履歴要約を取得
+        context = self.summarizer.to_context()
+        
         # LLMで語根ウェイトを推論
         llm_context = {
             "distance_km": distance_km,
             "occ_pct": occ_pct,
-            "toponym_stats": self.toponym_stats,
-            "false_pos": self.fp_log[-50:]  # 最新50件
+            "toponym_stats": self.toponym_stats,  # 地名統計を明示的に追加
+            "false_pos": self.fp_log[-10:] if self.fp_log else [],  # 最新10件（テンプレートと一致）
+            **context,  # 履歴要約を追加
         }
         
         try:
@@ -226,6 +234,15 @@ class HybridBO:
             
             # FPログを更新
             self.fp_log.extend(fp_examples)
+            
+            # 履歴へ追記
+            self.summarizer.update(
+                distance_km=distance_km,
+                occ_pct=occ_pct,
+                score=score,
+                weights=root_weights,
+                fp_roots=Counter(fp_examples)
+            )
             
             # 中間値を記録（pruning用）
             trial.report(score, step=0)
@@ -268,11 +285,13 @@ class HybridBO:
         best_trial = self.study.best_trial
         
         # 最良パラメータでLLM語根ウェイトを再取得
+        history_context = self.summarizer.to_context()
         best_context = {
             "distance_km": best_trial.params["distance_km"],
             "occ_pct": best_trial.params["occ_pct"],
-            "toponym_stats": self.toponym_stats,
-            "false_pos": self.fp_log[-50:]
+            "toponym_stats": self.toponym_stats,  # 地名統計を明示的に追加
+            "false_pos": self.fp_log[-10:] if self.fp_log else [],  # 最新10件（テンプレートと一致）
+            **history_context,  # 履歴要約を追加
         }
         
         try:

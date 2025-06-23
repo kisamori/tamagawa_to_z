@@ -32,7 +32,7 @@ def _get_cache(cache_dir: str = ".llm_root_cache") -> diskcache.Cache:
 
 def get_root_weights(
     context: Dict[str, Any],
-    model: str = "gpt-4o-mini",
+    model: str = "o3",
     temperature: float = 0.0,
     max_tokens: int = 1000,
     cache_dir: str = ".llm_root_cache",
@@ -79,20 +79,29 @@ def get_root_weights(
     
     try:
         # OpenAI API呼び出し
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_TIRE5"))
         
-        response = client.chat.completions.create(
+        # Responses APIでの実行
+        full_input = f"{sys_prompt}\n\n{user_prompt}"
+        response = client.responses.create(
             model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+            input=full_input
         )
         
-        # レスポンス解析
-        content = response.choices[0].message.content
+        # レスポンス解析 - Response APIのレスポンス処理
+        content = ""
+        if hasattr(response, 'output_text'):
+            content = response.output_text
+        elif hasattr(response, 'output') and hasattr(response.output, 'text'):
+            content = response.output.text
+        elif hasattr(response, 'content'):
+            content = response.content
+        elif hasattr(response, 'text'):
+            content = response.text
+        elif hasattr(response, 'choices') and response.choices:
+            content = response.choices[0].message.content
+        else:
+            content = str(response)
         weights = _parse_llm_response(content)
         
         # キャッシュに保存
@@ -160,14 +169,16 @@ def _generate_cache_key(
     temperature: float
 ) -> str:
     """コンテキストからキャッシュキーを生成する."""
-    # 決定論的なキーを作るため、辞書をソートしてシリアライズ
-    cache_data = {
-        "context": context,
-        "model": model, 
+    # 履歴ハッシュを含む主要な要素でキーを生成
+    key_components = {
+        "D": context.get("distance_km"),
+        "O": context.get("occ_pct"),
+        "H": context.get("history_hash"),
+        "model": model,
         "temperature": temperature
     }
     
-    serialized = json.dumps(cache_data, sort_keys=True, ensure_ascii=False)
+    serialized = json.dumps(key_components, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
 
@@ -227,22 +238,19 @@ def _parse_llm_response(content: str) -> Dict[str, float]:
         content_clean = content.strip()
         
         # ```json ... ``` の場合の処理
-        if content_clean.startswith("```"):
-            lines = content_clean.split('\n')
-            json_lines = []
-            in_json = False
-            
-            for line in lines:
-                if line.strip().startswith("```"):
-                    if in_json:
-                        break
-                    else:
-                        in_json = True
-                        continue
-                if in_json:
-                    json_lines.append(line)
-                    
-            content_clean = '\n'.join(json_lines)
+        if "```json" in content_clean:
+            # ```jsonブロックから JSON部分を抽出
+            json_start = content_clean.find("```json")
+            if json_start != -1:
+                json_start = content_clean.find("\n", json_start) + 1
+                json_end = content_clean.find("```", json_start)
+                if json_end != -1:
+                    content_clean = content_clean[json_start:json_end].strip()
+        elif "{" in content_clean and "}" in content_clean:
+            # JSONブロックのみを抽出
+            start = content_clean.find("{")
+            end = content_clean.rfind("}") + 1
+            content_clean = content_clean[start:end]
         
         # JSONパース
         response_data = json.loads(content_clean)

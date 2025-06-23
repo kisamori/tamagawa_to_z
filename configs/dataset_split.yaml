@@ -5,13 +5,17 @@ split_ratios:
   val: 0.3
   test: 0.2
 
+# 発見年フィルタ設定（各データセット別）
+discovery_year_filters:
+  train_discovery_year_min: 2015
+  train_discovery_year_max: 2030
+  val_discovery_year_min: 1700
+  val_discovery_year_max: 2030
+  test_discovery_year_min: 1700
+  test_discovery_year_max: 2030
+
 # ---- 入力ファイル設定 ----
 input_format: "kmz"  # サポート形式: kmz, csv, gpkg
-
-# ---- 旧設定（後方互換性のため残す） ----
-use_train_split: true         # ← ★ Train を作るか
-discovery_year_threshold: 2020 # ← ★ 発見年 ≥ ここ を Test-time に自動振分
-val_ratio: 0.4
 
 # ---- 文化圏タグ定義 ----
 culture_blocks:
