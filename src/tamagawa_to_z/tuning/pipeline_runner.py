@@ -21,10 +21,11 @@ def run_pipeline_with_params(
     root_weights: Dict[str, float],
     validation_set: gpd.GeoDataFrame,
     return_fp: bool = False,
+    return_intermediate: bool = False,
     experiment_id: Optional[str] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
     run_dir: Optional[Path] = None
-) -> Union[float, Tuple[float, list]]:
+) -> Union[float, Tuple[float, list], Tuple[float, list, Dict]]:
     """
     既存パイプラインを呼び出し、評価指標を返す薄ラッパ.
     
@@ -34,11 +35,12 @@ def run_pipeline_with_params(
         root_weights: 語根重み辞書
         validation_set: 検証用遺跡データ
         return_fp: False Positive例も返すかどうか
+        return_intermediate: S1-S5の中間データも返すかどうか
         experiment_id: 実験ID（Noneの場合は自動生成）
         config_overrides: 追加設定オーバーライド
         
     Returns:
-        評価スコア、またはスコアとFP例のタプル
+        評価スコア、またはスコアとFP例のタプル、または中間データも含むタプル
         
     Raises:
         ImportError: 既存パイプラインがインポートできない場合
@@ -79,7 +81,11 @@ def run_pipeline_with_params(
         
         # 既存パイプラインを実行（timestamp_dirを渡す）
         actual_run_dir = run_dir if run_dir else timestamp_dir
-        candidates = _run_existing_pipeline(param_patch, experiment_id, actual_run_dir)
+        result = _run_existing_pipeline(param_patch, experiment_id, actual_run_dir, return_intermediate)
+        if return_intermediate:
+            candidates, intermediate_data = result
+        else:
+            candidates = result
         
         # 評価指標を計算
         metrics = _calculate_metrics(candidates, validation_set)
@@ -89,7 +95,11 @@ def run_pipeline_with_params(
         
         logger.info(f"Pipeline completed: score={score:.4f}, candidates={len(candidates)}")
         
-        if return_fp:
+        if return_intermediate:
+            # 偽陽性例を抽出
+            fp_examples = _extract_false_positives(candidates, validation_set) if return_fp else []
+            return score, fp_examples, intermediate_data
+        elif return_fp:
             # 偽陽性例を抽出
             fp_examples = _extract_false_positives(candidates, validation_set)
             return score, fp_examples
@@ -104,7 +114,8 @@ def run_pipeline_with_params(
 def _run_existing_pipeline(
     param_patch: Dict[str, Any], 
     experiment_id: str,
-    run_dir: Optional[Path] = None
+    run_dir: Optional[Path] = None,
+    return_intermediate: bool = False
 ) -> pd.DataFrame:
     """
     既存のsite identification pipelineを実行する.
@@ -142,6 +153,18 @@ def _run_existing_pipeline(
         logger.debug("Executing S-5: Candidate filtering")
         candidates = pipeline.filter_candidates(with_distance)
         
+        # 中間データを準備
+        intermediate_data = None
+        if return_intermediate:
+            intermediate_data = {
+                'bbox_gdf': bbox_gdf,
+                'toponyms': toponyms,
+                'processed_toponyms': processed_toponyms,
+                'with_distance': with_distance,
+                'candidates': candidates,
+                'config': pipeline.config
+            }
+        
         # 結果を保存
         output_file = run_dir / f"{experiment_id}_candidates.csv"
         
@@ -164,7 +187,10 @@ def _run_existing_pipeline(
         
         logger.debug(f"Saved {len(candidates)} candidates to {output_file}")
         
-        return candidates
+        if return_intermediate:
+            return candidates, intermediate_data
+        else:
+            return candidates
         
     except ImportError as e:
         logger.error(f"Failed to import existing pipeline: {e}")
