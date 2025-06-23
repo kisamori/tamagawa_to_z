@@ -61,7 +61,7 @@ from tamagawa_to_z.harmonizer import (
     attach_distance, water_occurrence, filter_candidates, score_candidates
 )
 from tamagawa_to_z.harmonizer.preprocess import DEFAULT_BBOX, extract_toponyms_pyrosm
-from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex
+from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex, build_all_roots_regex
 
 
 def parse_args():
@@ -192,15 +192,22 @@ def step2_extract_toponyms(bbox_gdf, pbf_path, visualize=False, output_dir=None)
     logger.info("=== 🏷️  S-2: 水場系トポニムの抽出 ===")
     bbox = bbox_gdf.geometry.iloc[0]
     
-    # 最新のRegexパターンを構築
+    # 最新のRegexパターンを構築（all_roots.csv優先）
     try:
-        logger.info("=== 🔧 Water Vocabulary Regex Construction ===")
-        water_regex = build_water_regex()
+        logger.info("=== 🔧 Multi-Category Vocabulary Regex Construction ===")
+        try:
+            # まずall_roots.csvから全カテゴリで試行
+            water_regex = build_all_roots_regex()
+            logger.info("🌍 all_roots.csvから全カテゴリの語根を使用")
+        except Exception as all_roots_error:
+            logger.warning(f"all_roots.csvからの読み込みに失敗: {all_roots_error}")
+            logger.info("💧 water_roots.csvにフォールバック")
+            water_regex = build_water_regex()
         logger.info("=== ✅ Regex Construction Completed ===")
     except Exception as e:
-        logger.error(f"❌ roots.csvからのRegex構築に失敗: {e}")
-        logger.error("❌ 水語彙フィルタリングを実行できません。処理を中止します。")
-        raise RuntimeError(f"water_roots.csvが読み込めません: {e}")
+        logger.error(f"❌ 語根CSVからのRegex構築に失敗: {e}")
+        logger.error("❌ 語彙フィルタリングを実行できません。処理を中止します。")
+        raise RuntimeError(f"語根CSVが読み込めません: {e}")
     
     # Pyrosmを使用してローカルPBFファイルから水語彙地名を抽出
     logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")

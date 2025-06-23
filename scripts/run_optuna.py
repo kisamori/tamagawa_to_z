@@ -14,7 +14,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from tamagawa_to_z.dataset.splitter import DataSplitter
-from tamagawa_to_z.tuning.optuna_hybrid import HybridBO, create_sample_toponym_stats
+from tamagawa_to_z.tuning.optuna_hybrid import HybridBO, create_toponym_stats_from_all_roots
 
 # ロギング設定
 logging.basicConfig(
@@ -62,9 +62,9 @@ def main():
         help='詳細ログを表示'
     )
     parser.add_argument(
-        '--no-resume',
+        '--resume',
         action='store_true',
-        help='既存のstudyを再開しない'
+        help='既存のstudyを再開する'
     )
     
     args = parser.parse_args()
@@ -103,11 +103,11 @@ def main():
             if 'root' in stats_df.columns and 'count' in stats_df.columns:
                 stats = dict(zip(stats_df['root'], stats_df['count']))
             else:
-                logger.warning("地名統計CSVの形式が不正です。サンプルデータを使用します。")
-                stats = create_sample_toponym_stats()
+                logger.warning("地名統計CSVの形式が不正です。all_roots.csvから統計を生成します。")
+                stats = create_toponym_stats_from_all_roots()
         else:
-            logger.info("地名統計ファイルが指定されていません。サンプルデータを使用します。")
-            stats = create_sample_toponym_stats()
+            logger.info("地名統計ファイルが指定されていません。all_roots.csvから統計を生成します。")
+            stats = create_toponym_stats_from_all_roots()
         
         logger.info(f"地名統計: {len(stats)} roots, 合計出現数: {sum(stats.values())}")
         
@@ -117,16 +117,19 @@ def main():
             data_splitter=splitter,
             toponym_stats=stats,
             config_path=optuna_config,
-            n_trials=args.trials
+            n_trials=args.trials,
+            resume=args.resume
         )
         
         # 既存study情報表示
-        if not args.no_resume:
+        if args.resume:
             study_info = hybrid_bo.get_study_info()
             if study_info["n_trials"] > 0:
                 logger.info(f"既存study発見: {study_info['n_trials']} trials, best={study_info['best_value']:.4f}")
             else:
-                logger.info("新しいstudyを開始します")
+                logger.info("既存studyが見つかりません。新しいstudyを開始します")
+        else:
+            logger.info("新しいstudyを開始します")
         
         # 最適化実行
         logger.info("最適化を実行中...")
