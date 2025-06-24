@@ -69,7 +69,11 @@ def score_candidates(df: Union[pd.DataFrame, gpd.GeoDataFrame]) -> gpd.GeoDataFr
         if col not in result_df.columns:
             raise ValueError(f"DataFrame must have a '{col}' column")
     
-    # スコアの計算
+    # 注意: このスコア計算は現在使用されていません
+    # 実際のスコア計算は harmonizer.py の HarmonizerPipeline.filter_candidates で行われています
+    # このコードは削除予定ですが、互換性のため一時的に残しています
+    
+    # スコアの計算（未使用）
     # 1. 距離スコア: 距離が遠いほど高スコア（最大1.0）
     result_df["dist_score"] = result_df["dist_km"].clip(upper=10) / 10
     

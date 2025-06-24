@@ -354,7 +354,7 @@ def _calculate_mock_metrics(
 
 def _calculate_composite_score(metrics: Dict[str, float]) -> float:
     """
-    総合スコアを計算する.
+    総合スコアを計算する（候補ゼロ問題対策版）.
     
     Args:
         metrics: 評価指標辞書
@@ -362,19 +362,24 @@ def _calculate_composite_score(metrics: Dict[str, float]) -> float:
     Returns:
         総合スコア（最大化目標）
     """
-    # デフォルト重み（設定可能にする予定）
+    # 修正された重み
     weights = {
         'recall_weight': 0.6,
         'map_weight': 0.2,
-        'workload_weight': -0.2  # ペナルティ
+        'workload_weight': -0.1  # -0.2から-0.1に変更（ペナルティ軽減）
     }
     
     recall = metrics.get('recall_100', 0.0)
     map_score = metrics.get('map_score', 0.0)
-    workload = metrics.get('workload', 1000)
+    workload = metrics.get('workload', 0)
     
-    # ログスケールで workload penalty
-    workload_penalty = np.log10(workload + 1) / 4.0  # 正規化
+    # 候補ゼロのハードペナルティ
+    if workload == 0:
+        return -0.05
+    
+    # 正規化されたWorkloadペナルティ（0-1範囲）
+    W_MAX = 1000
+    workload_penalty = np.log10(workload + 1) / np.log10(W_MAX + 1)
     
     composite_score = (
         weights['recall_weight'] * recall +

@@ -8,6 +8,7 @@ Harmonizer: 多言語トポニム解析のメインクラス
 """
 
 import os
+import logging
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -18,6 +19,8 @@ from scipy.ndimage import gaussian_filter
 import unidecode
 import re
 from typing import Dict, List, Tuple, Union, Optional
+
+logger = logging.getLogger(__name__)
 
 # サブモジュールのインポート
 from . import preprocess
@@ -51,7 +54,6 @@ class HarmonizerPipeline:
         """pyrosmを使用して地名を抽出"""
         # 簡略化された実装：サンプルトポニムを生成
         import numpy as np
-        np.random.seed(42)
         
         # 実際のアマゾン地名の例
         sample_toponyms = [
@@ -147,17 +149,21 @@ class HarmonizerPipeline:
             base_score = 0.5
             
             # 距離によるペナルティ
-            if row['dist_km'] > distance_threshold:
-                base_score *= 0.5
+            dist_penalty = 0.5 if row['dist_km'] > distance_threshold else 1.0
+            base_score *= dist_penalty
             
             # 水域出現率によるボーナス
-            if row['occ_pct'] > occ_threshold:
-                base_score *= 1.5
+            occ_bonus = 1.5 if row['occ_pct'] > occ_threshold else 1.0
+            base_score *= occ_bonus
             
             # 語根ウェイトによる調整
             root = row.get('root', 'agua')
             weight = root_weights.get(root, 0.5)
             base_score *= weight
+            
+            # スコア計算の詳細をログ出力
+            logger.debug(f"Score calc: {row.get('name', 'Unknown')} = 0.5 × {dist_penalty} × {occ_bonus} × {weight} = {base_score:.4f} "
+                        f"(dist={row['dist_km']:.2f}km > {distance_threshold}, occ={row['occ_pct']:.1f}% > {occ_threshold}, root={root})")
             
             return base_score
         
