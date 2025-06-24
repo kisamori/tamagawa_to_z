@@ -15,6 +15,7 @@ from .rca import RootCauseAnalyzer
 from .generator import ProposalGenerator
 from .scorer import ProposalScorer
 from .formatter import YamlFormatter, MdFormatter
+from .optimization_analyzer_v2 import OptimizationAnalyzerV2
 
 
 class ResearcherAgent:
@@ -65,6 +66,31 @@ class ResearcherAgent:
         print(f"✅ Loaded: {len(data.candidates)} candidates, "
               f"{len(data.known_sites)} known sites, "
               f"{len(data.code_snippets)} code modules")
+        
+        # Add optimization analysis if available
+        optimization_analysis = None
+        if data.optimization_logs:
+            print("🔧 Performing optimization analysis...")
+            optimizer_analyzer = OptimizationAnalyzerV2(self.client)
+            try:
+                optimization_analysis = optimizer_analyzer.comprehensive_analysis(
+                    data.optimization_logs,
+                    data.optimization_config,
+                    domain_context={"domain": "archaeological_site_identification"}
+                )
+                print(f"✅ Optimization analysis complete (health score: {optimization_analysis.optimization_health_score:.1%})")
+                
+                if optimization_analysis.identified_issues:
+                    print(f"🔍 Found {len(optimization_analysis.identified_issues)} optimization issues:")
+                    for issue in optimization_analysis.identified_issues[:3]:  # Show top 3
+                        severity_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(issue.get("severity"), "⚪")
+                        print(f"  {severity_icon} {issue.get('issue_type', 'Unknown')}: {issue.get('description', '')[:80]}...")
+                
+            except Exception as e:
+                print(f"⚠️  Optimization analysis failed: {e}")
+                optimization_analysis = None
+        else:
+            print("ℹ️  No optimization logs found, skipping optimization analysis")
         
         # 2. Evaluate IA proposal
         print("📊 Evaluating IA proposal...")
@@ -124,12 +150,16 @@ class ResearcherAgent:
         
         # Generate Markdown report
         md_formatter = MdFormatter(output_dir)
-        report_path = md_formatter.write_report(ranked, ia_eval, failure_clusters)
+        # Include optimization analysis in the report context
+        extra_context = {
+            "optimization_analysis": optimization_analysis
+        }
+        report_path = md_formatter.write_report(ranked, ia_eval, failure_clusters, extra_context=extra_context)
         print(f"✅ Research report: {report_path}")
         
-        # Generate YAML plan
+        # Generate YAML plan  
         yaml_formatter = YamlFormatter(output_dir)
-        yaml_path = yaml_formatter.write_yaml(ranked)
+        yaml_path = yaml_formatter.write_yaml(ranked, extra_context=extra_context)
         print(f"✅ Research plan: {yaml_path}")
         
         print("🎉 Researcher Agent analysis complete!")

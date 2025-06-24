@@ -20,6 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "utils"))
 from code_extract import auto_extract_from_module
 
+# Import optimization schema
+from .schemas.optimization_schema import OptimizationSummary, OptimizationTrial, OptimizationObjective, OptimizationSearchSpace, calculate_optimization_patterns
+
 
 @dataclass
 class LoadedData:
@@ -32,6 +35,8 @@ class LoadedData:
     ia_plan: Dict[str, Any]
     code_snippets: Dict[str, Dict[str, str]]
     meta_info: Dict[str, Any]
+    optimization_logs: Optional[OptimizationSummary] = None  # 新規追加
+    optimization_config: Optional[Dict[str, Any]] = None     # 新規追加
 
 
 class ArtefactLoader:
@@ -78,6 +83,10 @@ class ArtefactLoader:
         # Extract code snippets
         code_snippets = self._extract_code_snippets()
         
+        # Load optimization logs and config
+        optimization_logs = self.load_optimization_logs()
+        optimization_config = self.load_optimization_config()
+        
         return LoadedData(
             candidates=candidates,
             toponym_dict=toponym_dict,
@@ -86,7 +95,9 @@ class ArtefactLoader:
             ia_report=ia_report,
             ia_plan=ia_plan,
             code_snippets=code_snippets,
-            meta_info=self.meta_info
+            meta_info=self.meta_info,
+            optimization_logs=optimization_logs,
+            optimization_config=optimization_config
         )
     
     def _load_candidates(self) -> pd.DataFrame:
@@ -432,5 +443,249 @@ class ArtefactLoader:
                     for found_file in search_dir.glob(pattern):
                         if found_file.exists():
                             return found_file
+        
+        return None
+    
+    def load_optimization_logs(self) -> Optional[OptimizationSummary]:
+        """最適化ログを汎用形式で読み込み"""
+        
+        # 1. 標準化済みファイルを探す
+        summary_files = ["optimization_summary.yaml", "opt_summary.yaml"]
+        for summary_file in summary_files:
+            path = self._find_file_in_search_paths(summary_file)
+            if path:
+                try:
+                    return OptimizationSummary.from_yaml(path)
+                except Exception as e:
+                    print(f"Warning: Could not load optimization summary from {path}: {e}")
+        
+        # 2. Optuna固有ファイルから変換
+        optuna_data = self._load_optuna_logs()
+        if optuna_data:
+            try:
+                return self._convert_optuna_to_standard(optuna_data)
+            except Exception as e:
+                print(f"Warning: Could not convert Optuna logs to standard format: {e}")
+        
+        # 3. 他の形式（将来の拡張ポイント）
+        # Grid Search、Manual等のログ変換
+        
+        print("Warning: No optimization logs found")
+        return None
+    
+    def load_optimization_config(self) -> Optional[Dict[str, Any]]:
+        """最適化設定を読み込み"""
+        
+        config_files = [
+            "optuna_space.yaml",
+            "optimization_config.yaml", 
+            "tuning_config.yaml"
+        ]
+        
+        for config_file in config_files:
+            path = self._find_file_in_search_paths(config_file)
+            if path:
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f)
+                    print(f"✅ Loaded optimization config from: {path}")
+                    return config
+                except Exception as e:
+                    print(f"Warning: Could not load optimization config from {path}: {e}")
+        
+        print("Warning: No optimization config found")
+        return None
+    
+    def _load_optuna_logs(self) -> Optional[Dict[str, Any]]:
+        """Optuna固有のログファイルを読み込み"""
+        
+        optuna_files = {
+            "optimization_history.json": "json",
+            "best_params.json": "json",
+            "optuna_hybrid.log": "log",
+            "optuna.db": "db"  # SQLiteデータベース（将来対応）
+        }
+        
+        loaded_data = {}
+        
+        for filename, file_type in optuna_files.items():
+            path = self._find_file_in_search_paths(filename)
+            if path:
+                try:
+                    if file_type == "json":
+                        with open(path, 'r', encoding='utf-8') as f:
+                            loaded_data[filename] = json.load(f)
+                    elif file_type == "log":
+                        loaded_data[filename] = self._parse_optuna_log(path)
+                    elif file_type == "db":
+                        # SQLiteデータベース読み込み（将来実装）
+                        loaded_data[filename] = {"type": "sqlite", "path": str(path)}
+                    
+                    print(f"✅ Loaded Optuna file: {path}")
+                    
+                except Exception as e:
+                    print(f"Warning: Could not load {path}: {e}")
+        
+        return loaded_data if loaded_data else None
+    
+    def _parse_optuna_log(self, log_path: Path) -> Dict[str, Any]:
+        """Optunaログファイルを解析"""
+        
+        log_data = {
+            "trials_info": [],
+            "errors": [],
+            "warnings": [],
+            "config_info": {}
+        }
+        
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    
+                    # 試行完了ログの解析
+                    if "Trial" in line and "finished with value" in line:
+                        # 例: [I 2025-06-23 23:07:36,744] Trial 0 finished with value: -0.04515449934959718
+                        parts = line.split()
+                        if len(parts) >= 8:
+                            try:
+                                trial_num = int(parts[4])
+                                score_str = parts[8].rstrip('.')
+                                score = float(score_str)
+                                
+                                log_data["trials_info"].append({
+                                    "trial_number": trial_num,
+                                    "score": score,
+                                    "line_number": line_num,
+                                    "raw_line": line
+                                })
+                            except (ValueError, IndexError):
+                                pass
+                    
+                    # エラーログの解析
+                    elif "ERROR" in line:
+                        log_data["errors"].append({
+                            "line_number": line_num,
+                            "message": line
+                        })
+                    
+                    # 警告ログの解析
+                    elif "WARNING" in line or "Warning" in line:
+                        log_data["warnings"].append({
+                            "line_number": line_num,
+                            "message": line
+                        })
+                    
+                    # 設定情報の解析
+                    elif "distance_km" in line or "occ_pct" in line:
+                        log_data["config_info"]["params_logged"] = True
+        
+        except Exception as e:
+            print(f"Warning: Error parsing log file {log_path}: {e}")
+        
+        return log_data
+    
+    def _convert_optuna_to_standard(self, optuna_data: Dict[str, Any]) -> OptimizationSummary:
+        """Optunaログを標準形式に変換"""
+        
+        # 最適化履歴から試行データを抽出
+        history_data = optuna_data.get("optimization_history.json", {})
+        trials_list = history_data.get("optimization_history", [])
+        
+        # 最良パラメータ情報
+        best_params_data = optuna_data.get("best_params.json", {})
+        
+        # ログファイル情報
+        log_data = optuna_data.get("optuna_hybrid.log", {})
+        
+        # 試行データの変換
+        trials = []
+        for i, trial_data in enumerate(trials_list):
+            trials.append(OptimizationTrial(
+                trial_id=trial_data.get("trial_number", i),
+                score=trial_data.get("score"),
+                candidates_count=trial_data.get("candidates_count", 0),
+                params=trial_data.get("params", {}),
+                timestamp=trial_data.get("datetime"),
+                status="completed" if trial_data.get("score") is not None else "failed"
+            ))
+        
+        # 目的関数設定（デフォルト値を使用、実際の設定は optimization_config から取得）
+        objective = OptimizationObjective(
+            direction="maximize",  # Optunaのデフォルト
+            function_design="weighted_composite",
+            weights={
+                "recall": 0.6,
+                "map": 0.2, 
+                "workload": -0.2
+            }
+        )
+        
+        # 探索空間（デフォルト値、実際の設定は optimization_config から取得）
+        search_space = OptimizationSearchSpace(parameters={
+            "distance_km": {"type": "float", "low": 1.0, "high": 10.0, "log": False},
+            "occ_pct": {"type": "float", "low": 1.0, "high": 10.0, "log": False}
+        })
+        
+        # パターン分析
+        patterns = calculate_optimization_patterns(trials)
+        
+        # サマリー作成
+        summary = OptimizationSummary(
+            method="optuna_tpe",
+            status="completed",
+            total_trials=len(trials),
+            successful_trials=len([t for t in trials if t.status == "completed"]),
+            objective=objective,
+            search_space=search_space,
+            trials=trials,
+            patterns=patterns,
+            study_name=best_params_data.get("study_name")
+        )
+        
+        return summary
+    
+    def _find_file_in_search_paths(self, filename: str) -> Optional[Path]:
+        """複数の検索パスでファイルを探す"""
+        
+        search_paths = []
+        
+        # 1. アーティファクトディレクトリ
+        search_paths.append(self.artefact_dir)
+        
+        # 2. 最適化関連の標準ディレクトリ
+        search_paths.extend([
+            self.artefact_dir / "optuna",
+            self.artefact_dir / "optimization",
+            self.artefact_dir / ".." / "optuna",
+            self.artefact_dir / ".." / "optimization"
+        ])
+        
+        # 3. プロジェクトルートベースの検索
+        if self.project_root:
+            search_paths.extend([
+                self.project_root / "data" / "output" / "optuna",
+                self.project_root / "data" / "output" / "optimization",
+                self.project_root / "configs",
+                self.project_root / "config"
+            ])
+        
+        # 4. 設定で指定されたパス
+        default_paths = self.config.get('optimization_paths', {})
+        if filename in default_paths:
+            search_paths.append(Path(default_paths[filename]))
+        
+        # 各パスで検索
+        for search_path in search_paths:
+            if search_path.exists():
+                # 直接ファイル名で検索
+                target_file = search_path / filename
+                if target_file.exists():
+                    return target_file
+                
+                # グロブパターンで検索
+                for found_file in search_path.glob(f"*{filename}*"):
+                    if found_file.is_file():
+                        return found_file
         
         return None

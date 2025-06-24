@@ -34,7 +34,8 @@ class MdFormatter:
     def write_report(self, 
                     ranked_proposals: List[RankedProposal],
                     ia_eval: IaEffect,
-                    failure_clusters: List[FailureCluster]) -> Path:
+                    failure_clusters: List[FailureCluster],
+                    extra_context: Dict[str, Any] = None) -> Path:
         """
         Write comprehensive Markdown research report.
         
@@ -46,6 +47,8 @@ class MdFormatter:
             IA proposal evaluation
         failure_clusters : List[FailureCluster]
             Identified failure patterns
+        extra_context : Dict[str, Any], optional
+            Additional context including optimization analysis
             
         Returns
         -------
@@ -53,7 +56,7 @@ class MdFormatter:
             Path to generated report file
         """
         # Generate report content
-        content = self._generate_report_content(ranked_proposals, ia_eval, failure_clusters)
+        content = self._generate_report_content(ranked_proposals, ia_eval, failure_clusters, extra_context or {})
         
         # Write to file
         today = date.today().isoformat()
@@ -67,10 +70,15 @@ class MdFormatter:
     def _generate_report_content(self,
                                ranked_proposals: List[RankedProposal],
                                ia_eval: IaEffect,
-                               failure_clusters: List[FailureCluster]) -> str:
+                               failure_clusters: List[FailureCluster],
+                               extra_context: Dict[str, Any] = None) -> str:
         """Generate the full Markdown report content."""
         today = date.today().isoformat()
         timestamp = datetime.now().isoformat()
+        
+        # 最適化分析があるかチェック
+        extra_context = extra_context or {}
+        optimization_analysis = extra_context.get("optimization_analysis")
         
         content = f"""# Researcher Agent Analysis Report
 
@@ -82,14 +90,62 @@ class MdFormatter:
 
 ## Executive Summary
 
-This report presents a comprehensive analysis of the Inspector Agent's proposal and provides three alternative improvement strategies. The analysis identified {len(failure_clusters)} failure patterns and generated {len(ranked_proposals)} ranked proposals for system optimization.
+This report presents a comprehensive analysis of the Inspector Agent's proposal and provides three alternative improvement strategies. The analysis identified {len(failure_clusters)} failure patterns and generated {len(ranked_proposals)} ranked proposals for system optimization."""
+        
+        # 最適化分析があれば追加
+        if optimization_analysis:
+            content += f"""
+
+### Optimization Analysis:
+- **Optimization Health Score**: {optimization_analysis.optimization_health_score:.1%}
+- **Key Issues Found**: {len(optimization_analysis.identified_issues)}
+- **Analysis Confidence**: {optimization_analysis.confidence:.1%}"""
+
+        content += f"""
 
 ### Key Findings:
 - **IA Proposal Confidence**: {ia_eval.confidence:.1%}
 - **Primary Issue**: {failure_clusters[0].root_cause if failure_clusters else 'No critical issues identified'}
 - **Recommended Action**: {ranked_proposals[0].proposal.title if ranked_proposals else 'No proposals generated'}
 
----
+---"""
+        
+        # 最適化分析の詳細セクション
+        if optimization_analysis:
+            content += f"""
+
+## Optimization Process Analysis
+
+### Overall Assessment
+{optimization_analysis.overall_assessment}
+
+### Key Findings
+"""
+            for i, finding in enumerate(optimization_analysis.key_findings, 1):
+                content += f"{i}. {finding}\n"
+
+            if optimization_analysis.identified_issues:
+                content += f"""
+
+### Identified Optimization Issues
+"""
+                for issue in optimization_analysis.identified_issues:
+                    severity_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(issue.get("severity", ""), "⚪")
+                    content += f"""
+#### {severity_icon} {issue.get('issue_type', 'Unknown Issue')} ({issue.get('severity', 'unknown').title()})
+
+**Description**: {issue.get('description', 'No description available')}
+
+**Evidence**: {issue.get('evidence', 'No evidence provided')}
+
+**Potential Causes**: {', '.join(issue.get('potential_causes', ['Unknown']))}
+
+**Impact**: {issue.get('impact', 'Impact not specified')}
+"""
+
+            content += "\n---"
+
+        content += """
 
 ## Inspector Agent Proposal Evaluation
 
@@ -166,15 +222,20 @@ This report presents a comprehensive analysis of the Inspector Agent's proposal 
                 proposal = ranked.proposal
                 rank_icon = {1: "🥇", 2: "🥈", 3: "🥉"}.get(ranked.rank, f"{ranked.rank}.")
                 
+                score_text = f"{ranked.total_score:.2f}"
+                improvement_text = f"{ranked.improvement_score:.2f}"
+                diversity_text = f"{ranked.diversity_score:.2f}"
+                cost_text = f"{ranked.cost_score:.2f}"
+                
                 content += f"""### {rank_icon} Proposal {proposal.id}: {proposal.title}
 
-**Overall Score**: {ranked.total_score:.2f}/1.0  
+**Overall Score**: {score_text}/1.0  
 **Rank**: #{ranked.rank}
 
 #### Score Breakdown:
-- **Improvement Potential**: {ranked.improvement_score:.2f}/1.0
-- **Approach Diversity**: {ranked.diversity_score:.2f}/1.0  
-- **Implementation Cost**: {ranked.cost_score:.2f}/1.0 (lower cost = higher score)
+- **Improvement Potential**: {improvement_text}/1.0
+- **Approach Diversity**: {diversity_text}/1.0  
+- **Implementation Cost**: {cost_text}/1.0 (lower cost = higher score)
 
 #### Proposed Changes:
 """
@@ -233,7 +294,8 @@ Based on the analysis, **Proposal {top_proposal.id}** offers the best balance of
 """
             if len(ranked_proposals) > 1:
                 for ranked in ranked_proposals[1:]:
-                    content += f"- **Proposal {ranked.proposal.id}**: {ranked.proposal.title} (Score: {ranked.total_score:.2f})\n"
+                    score_val = f"{ranked.total_score:.2f}"
+                    content += f"- **Proposal {ranked.proposal.id}**: {ranked.proposal.title} (Score: {score_val})\n"
             
             content += f"""
 ### 3. Monitoring and Evaluation
@@ -346,7 +408,7 @@ class YamlFormatter:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
-    def write_yaml(self, ranked_proposals: List[RankedProposal]) -> Path:
+    def write_yaml(self, ranked_proposals: List[RankedProposal], extra_context: Dict[str, Any] = None) -> Path:
         """
         Write research plan YAML with schema validation.
         
@@ -354,6 +416,8 @@ class YamlFormatter:
         ----------
         ranked_proposals : List[RankedProposal]
             Ranked improvement proposals
+        extra_context : Dict[str, Any], optional
+            Additional context including optimization analysis
             
         Returns
         -------
