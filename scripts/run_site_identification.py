@@ -117,6 +117,7 @@ def parse_args():
     parser.add_argument(
         '--visualize', 
         action='store_true',
+        default=True,
         help='処理結果を可視化する'
     )
     parser.add_argument(
