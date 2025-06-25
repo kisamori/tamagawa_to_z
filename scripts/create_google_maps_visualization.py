@@ -264,8 +264,41 @@ def create_google_maps_html(existing_sites, candidates, output_path):
         }}
     </script>
     
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+    <script>
+        // Google Maps APIキーチェック
+        const API_KEY = 'YOUR_API_KEY';
+        if (API_KEY === 'YOUR_API_KEY') {{
+            document.body.innerHTML = `
+                <div style="padding: 20px; font-family: Arial, sans-serif;">
+                    <h2>🔑 Google Maps APIキーが必要です</h2>
+                    <p><strong>この地図を表示するには、Google Maps APIキーを設定してください。</strong></p>
+                    
+                    <h3>手順:</h3>
+                    <ol>
+                        <li><a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>にアクセス</li>
+                        <li>プロジェクトを作成または選択</li>
+                        <li>Maps JavaScript APIを有効化</li>
+                        <li>APIキーを作成</li>
+                        <li>このHTMLファイル内の 'YOUR_API_KEY' を取得したAPIキーに置換</li>
+                    </ol>
+                    
+                    <h3>代替案:</h3>
+                    <p>APIキー不要の <a href="leaflet_visualization.html">Leaflet版地図</a> もご利用いただけます。</p>
+                    
+                    <div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin-top: 20px;">
+                        <strong>ファイル:</strong> {output_path}<br>
+                        <strong>置換対象:</strong> 'YOUR_API_KEY' → 実際のAPIキー
+                    </div>
+                </div>
+            `;
+        }} else {{
+            // APIキーが設定されている場合はGoogle Mapsを読み込み
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${{API_KEY}}&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }}
     </script>
 </body>
 </html>"""

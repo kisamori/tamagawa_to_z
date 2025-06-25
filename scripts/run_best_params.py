@@ -22,6 +22,9 @@ except ImportError:
     HAS_CONTEXTILY = False
     logger = logging.getLogger(__name__)
 
+# プロジェクトのルートディレクトリをパスに追加
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 # パッケージのインポートパス追加
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
@@ -814,9 +817,14 @@ def main():
             best_params = json.load(f)
         
         logger.info("🏆 最良パラメータ:")
-        logger.info(f"  距離しきい値: {best_params['distance_km']:.2f} km")
-        logger.info(f"  水域出現率: {best_params['occ_pct']:.2f} %")
-        logger.info(f"  語根ウェイト数: {len(best_params['root_weights'])}")
+        # Handle different parameter key formats
+        distance_key = 'distance_km' if 'distance_km' in best_params else 'distance_threshold_km'
+        occ_key = 'occ_pct' if 'occ_pct' in best_params else 'occ_pct_threshold' 
+        root_key = 'root_weights' if 'root_weights' in best_params else 'root_weight_table'
+        
+        logger.info(f"  距離しきい値: {best_params[distance_key]:.2f} km")
+        logger.info(f"  水域出現率: {best_params[occ_key]:.2f} %")
+        logger.info(f"  語根ウェイト数: {len(best_params[root_key])}")
         logger.info(f"  最適化スコア: {best_params.get('score', 'N/A')}")
         
         # データ分割器初期化
@@ -851,9 +859,9 @@ def main():
         # Validation セットで評価（可視化用に中間データも取得）
         logger.info("=== Validation セット評価 ===")
         val_score, val_fp, intermediate_data = run_pipeline_with_params(
-            distance_km=best_params['distance_km'],
-            occ_pct=best_params['occ_pct'],
-            root_weights=best_params['root_weights'],
+            distance_km=best_params[distance_key],
+            occ_pct=best_params[occ_key],
+            root_weights=best_params[root_key],
             validation_set=splits['val'],
             return_fp=True,
             return_intermediate=True,
@@ -884,9 +892,9 @@ def main():
             if 'test_time' in splits and len(splits['test_time']) > 0:
                 logger.info("=== Test-time セット評価 ===")
                 test_time_score, test_time_fp = run_pipeline_with_params(
-                    distance_km=best_params['distance_km'],
-                    occ_pct=best_params['occ_pct'],
-                    root_weights=best_params['root_weights'],
+                    distance_km=best_params[distance_key],
+                    occ_pct=best_params[occ_key],
+                    root_weights=best_params[root_key],
                     validation_set=splits['test_time'],
                     return_fp=True,
                     experiment_id=f"{experiment_id}_test_time"
@@ -911,9 +919,9 @@ def main():
                     if len(region_data) > 0:
                         logger.info(f"  📍 {region_name} region...")
                         region_score, region_fp = run_pipeline_with_params(
-                            distance_km=best_params['distance_km'],
-                            occ_pct=best_params['occ_pct'],
-                            root_weights=best_params['root_weights'],
+                            distance_km=best_params[distance_key],
+                            occ_pct=best_params[occ_key],
+                            root_weights=best_params[root_key],
                             validation_set=region_data,
                             return_fp=True,
                             experiment_id=f"{experiment_id}_region_{region_name}"
@@ -1034,6 +1042,58 @@ def main():
                         logger.info("✅ 包括的ダッシュボード作成完了")
                     except Exception as e:
                         logger.error(f"包括的ダッシュボード作成エラー: {e}")
+                
+                # Google Maps/Leaflet可視化を作成
+                if main_candidates_file:
+                    logger.info("=== 🗺️ Google Maps/Leaflet可視化作成 ===")
+                    try:
+                        import subprocess
+                        
+                        # Leaflet版を作成
+                        leaflet_cmd = [
+                            sys.executable, 
+                            str(PROJECT_ROOT / 'scripts/create_leaflet_visualization.py'),
+                            '--output-dir', str(viz_output_dir),
+                            '--csv-path', str(main_candidates_file)
+                        ]
+                        
+                        result = subprocess.run(leaflet_cmd, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            logger.info("✅ Leaflet可視化を作成しました")
+                        else:
+                            logger.warning(f"Leaflet可視化の作成に失敗: {result.stderr}")
+                        
+                        # Google Maps版を作成
+                        gmaps_cmd = [
+                            sys.executable, 
+                            str(PROJECT_ROOT / 'scripts/create_google_maps_visualization.py'),
+                            '--output-dir', str(viz_output_dir),
+                            '--csv-path', str(main_candidates_file)
+                        ]
+                        
+                        result = subprocess.run(gmaps_cmd, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            logger.info("✅ Google Maps可視化を作成しました")
+                        else:
+                            logger.warning(f"Google Maps可視化の作成に失敗: {result.stderr}")
+                        
+                        # KMZ版を作成
+                        kmz_cmd = [
+                            sys.executable, 
+                            str(PROJECT_ROOT / 'scripts/create_kmz_export.py'),
+                            '--output-dir', str(viz_output_dir),
+                            '--csv-path', str(main_candidates_file),
+                            '--experiment-id', experiment_id
+                        ]
+                        
+                        result = subprocess.run(kmz_cmd, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            logger.info("✅ KMZ可視化を作成しました")
+                        else:
+                            logger.warning(f"KMZ可視化の作成に失敗: {result.stderr}")
+                            
+                    except Exception as e:
+                        logger.warning(f"可視化作成中にエラーが発生: {e}")
                 
                 logger.info(f"📊 可視化結果保存先: {viz_output_dir}")
                 logger.info("=== 可視化完了 ===")

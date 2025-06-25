@@ -704,6 +704,21 @@ def main():
                 logger.info("✅ Google Maps可視化を作成しました")
             else:
                 logger.warning(f"Google Maps可視化の作成に失敗: {result.stderr}")
+            
+            # KMZ版を作成
+            kmz_cmd = [
+                sys.executable, 
+                str(PROJECT_ROOT / 'scripts/create_kmz_export.py'),
+                '--output-dir', str(viz_output_dir),
+                '--csv-path', str(args.output_path),
+                '--experiment-id', f'site_identification_{timestamp}'
+            ]
+            
+            result = subprocess.run(kmz_cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info("✅ KMZ可視化を作成しました")
+            else:
+                logger.warning(f"KMZ可視化の作成に失敗: {result.stderr}")
                 
         except Exception as e:
             logger.warning(f"可視化作成中にエラーが発生: {e}")
