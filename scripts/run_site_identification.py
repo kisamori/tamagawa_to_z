@@ -67,7 +67,7 @@ from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex, build_
 def parse_args():
     """コマンドライン引数をパースする"""
     parser = argparse.ArgumentParser(
-        description='古河道候補地特定専用スクリプト（地理空間分析パイプライン）'
+        description='古河道候補地特定専用スクリプト(地理空間分析パイプライン)'
     )
     
     # BBOX オプション
@@ -75,9 +75,9 @@ def parse_args():
         '--bbox',
         type=float,
         nargs=4,
-        metavar=('LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'),
+        metavar=['LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'],
         default=list(DEFAULT_BBOX.bounds),
-        help='対象領域のBBOX (lon_min lat_min lon_max lat_max)'
+        help='対象領域のBBOX: lon_min lat_min lon_max lat_max'
     )
     
     # データパスの設定
@@ -110,7 +110,7 @@ def parse_args():
     parser.add_argument(
         '--skip-water-freq',
         action='store_true',
-        help='水域頻度計算をスキップする（距離のみで候補抽出）'
+        help='水域頻度計算をスキップする(距離のみで候補抽出)'
     )
     
     # 可視化オプション
@@ -125,6 +125,50 @@ def parse_args():
         type=str,
         default=str(PROJECT_ROOT / 'data/plots'),
         help='可視化画像の出力ディレクトリ'
+    )
+    
+    # 最適化パラメータ（新規追加）
+    parser.add_argument(
+        '--dist-threshold',
+        type=float,
+        default=3.0,
+help='距離閾値(km)。この値より大きい距離の地点を候補とする'
+    )
+    parser.add_argument(
+        '--occ-threshold',
+        type=float,
+        default=5.0,
+help='水域出現率閾値(pct)。この値より小さい出現率の地点を候補とする'
+    )
+    parser.add_argument(
+        '--root-weights-json',
+        type=str,
+        default='{}',
+help='語根ウェイト辞書 JSON形式'
+    )
+    
+    # 出力制御（新規追加）
+    parser.add_argument(
+        '--output-metrics-json',
+        type=str,
+        help='メトリクス結果をJSONで出力するファイルパス'
+    )
+    parser.add_argument(
+        '--quiet',
+        action='store_true',
+        help='ログ出力を最小限に抑制する'
+    )
+    parser.add_argument(
+        '--no-visualize',
+        action='store_true', 
+help='可視化処理を無効にする --visualizeを上書き'
+    )
+    
+    # 事前計算モード（新規追加）
+    parser.add_argument(
+        '--precompute-only',
+        action='store_true',
+        help='S1-S4のみ実行し、threshold適用前の全候補を出力（Optuna最適化用）'
     )
     
     return parser.parse_args()
@@ -365,7 +409,7 @@ def step4_calculate_distance(names, rivers_path, visualize=False, output_dir=Non
     return names
 
 
-def step5_extract_candidates(names, gsw_path, visualize=False, skip_water_freq=False, output_dir=None):
+def step5_extract_candidates(names, gsw_path, args, visualize=False, skip_water_freq=False, output_dir=None):
     """S-5: "川が無いのに川名が残る"ポイント抽出"""
     logger.info("=== 🎯 S-5: 候補地点抽出 ===")
     
@@ -394,8 +438,10 @@ def step5_extract_candidates(names, gsw_path, visualize=False, skip_water_freq=F
     
     # 候補地点の抽出
     if 'dist_km' in names.columns and 'occ_pct' in names.columns:
-        # 閾値ベースでフィルタリング
-        candidates = filter_candidates(names)
+        # 閾値ベースでフィルタリング（パラメータ渡し）
+        candidates = filter_candidates(names, 
+                                     dist_threshold=args.dist_threshold,
+                                     occ_threshold=args.occ_threshold)
         logger.info(f"{len(candidates)}件の候補地点を抽出しました")
         
         # スコアリング
@@ -523,7 +569,26 @@ def main():
     """メイン処理"""
     args = parse_args()
     
-    logger.info("=== 🎯 古河道候補地特定専用スクリプト開始 ===")
+    # quiet モードでもログレベルを調整（ERRORは表示、INFOは重要なもののみ）
+    if args.quiet:
+        # 重要な進捗情報は表示、詳細ログは抑制
+        logging.getLogger().setLevel(logging.WARNING)
+        # でも S-1～S-5 の進捗は表示したいので特別処理
+        progress_logger = logging.getLogger("PROGRESS")
+        progress_logger.setLevel(logging.INFO)
+        progress_handler = logging.StreamHandler()
+        progress_handler.setFormatter(logging.Formatter('%(message)s'))
+        progress_logger.addHandler(progress_handler)
+        progress_logger.propagate = False
+    else:
+        progress_logger = logger
+    
+    progress_logger.info("=== 🎯 古河道候補地特定専用スクリプト開始 ===")
+    
+    # パラメータ表示（quiet モードでも表示）
+    if hasattr(args, 'dist_threshold') and hasattr(args, 'occ_threshold'):
+        progress_logger.info(f"📏 距離閾値: {args.dist_threshold} km")
+        progress_logger.info(f"💧 水域頻度閾値: {args.occ_threshold} %")
     
     # 入力データファイルの確認
     missing_files = check_data_files(args.rivers_path, args.gsw_path, skip_water_freq=args.skip_water_freq)
@@ -539,27 +604,111 @@ def main():
         logger.info(f"📁 可視化出力ディレクトリ: {viz_output_dir}")
     
     # S-1: 対象地域のBBox定義
-    bbox_gdf = step1_define_bbox(args.bbox, visualize=args.visualize, output_dir=viz_output_dir)
+    progress_logger.info("=== 🌍 S-1: 対象地域のBBox定義 ===")
+    bbox_gdf = step1_define_bbox(args.bbox, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
     
     # S-2: 水場系トポニムの抽出
-    names = step2_extract_toponyms(bbox_gdf, args.pbf_path, visualize=args.visualize, output_dir=viz_output_dir)
+    progress_logger.info("=== 🏷️  S-2: 水場系トポニムの抽出 ===")
+    names = step2_extract_toponyms(bbox_gdf, args.pbf_path, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
     if names.empty:
-        logger.error("地名収集に失敗しました。処理を終了します。")
+        progress_logger.error("地名収集に失敗しました。処理を終了します。")
         return
+    progress_logger.info(f"   ✅ {len(names)} 件の地名を抽出")
     
     # S-3: クレンジング & タイプ付け
-    names = step3_process_toponyms(names, visualize=args.visualize, output_dir=viz_output_dir)
+    progress_logger.info("=== 🧹 S-3: クレンジング & タイプ付け ===")
+    names = step3_process_toponyms(names, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
+    progress_logger.info(f"   ✅ {len(names)} 件の地名を処理")
     
     # S-4: 現河道との距離計算
-    names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize, output_dir=viz_output_dir)
+    progress_logger.info("=== 📏 S-4: 現河道との距離計算 ===")
+    names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
+    progress_logger.info(f"   ✅ {len(names)} 件の距離を計算")
+    
+    # 事前計算モード：S-4で停止し、水域頻度も計算して全データを出力
+    if args.precompute_only:
+        progress_logger.info("=== 🔄 事前計算モード: 水域頻度計算中 ===")
+        # 水域頻度を追加（threshold適用前の全データに対して）
+        if not args.skip_water_freq and os.path.exists(args.gsw_path):
+            names = water_occurrence(names, args.gsw_path)
+            progress_logger.info(f"   ✅ {len(names)} 件の水域頻度を計算")
+        else:
+            # GSWデータが無い場合は0で埋める
+            names['water_occurrence_pct'] = 0.0
+            progress_logger.info("   ⚠️ 水域頻度計算をスキップ（デフォルト値0.0を設定）")
+        
+        # 全データを保存（threshold適用前）
+        save_results(names, args.output_path)
+        progress_logger.info(f"💾 事前計算結果を保存: {args.output_path}")
+        progress_logger.info(f"   📊 総件数: {len(names)} 件（threshold適用前）")
+        
+        # メトリクス出力
+        if args.output_metrics_json:
+            import json
+            metrics = {
+                'mode': 'precompute_only',
+                'total_toponyms': len(names),
+                'bbox': args.bbox,
+                'timestamp': datetime.now().isoformat(),
+                'has_distance': 'distance_to_river_km' in names.columns,
+                'has_water_occurrence': 'water_occurrence_pct' in names.columns
+            }
+            with open(args.output_metrics_json, 'w', encoding='utf-8') as f:
+                json.dump(metrics, f, ensure_ascii=False, indent=2)
+            progress_logger.info(f"📋 メトリクスを保存: {args.output_metrics_json}")
+        
+        progress_logger.info("=== ✅ 事前計算モード完了 ===")
+        return
     
     # S-5: "川が無いのに川名が残る"ポイント抽出
-    candidates = step5_extract_candidates(names, args.gsw_path, visualize=args.visualize, skip_water_freq=args.skip_water_freq, output_dir=viz_output_dir)
+    progress_logger.info("=== 🎯 S-5: 候補地点抽出 ===")
+    candidates = step5_extract_candidates(names, args.gsw_path, args, visualize=args.visualize and not args.no_visualize, skip_water_freq=args.skip_water_freq, output_dir=viz_output_dir)
+    if candidates is not None:
+        progress_logger.info(f"   ✅ {len(candidates)} 件の候補を抽出")
     
     # 結果の保存
     save_results(candidates, args.output_path)
+    progress_logger.info(f"💾 結果を保存: {args.output_path}")
     
-    logger.info("=== ✅ 古河道候補地特定専用スクリプト完了 ===")
+    # Google Maps可視化を作成
+    if args.visualize and viz_output_dir and candidates is not None and len(candidates) > 0:
+        logger.info("=== 🗺️ Google Maps可視化作成 ===")
+        try:
+            import subprocess
+            import sys
+            
+            # Leaflet版を作成
+            leaflet_cmd = [
+                sys.executable, 
+                str(PROJECT_ROOT / 'scripts/create_leaflet_visualization.py'),
+                '--output-dir', str(viz_output_dir),
+                '--csv-path', str(args.output_path)
+            ]
+            
+            result = subprocess.run(leaflet_cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info("✅ Leaflet可視化を作成しました")
+            else:
+                logger.warning(f"Leaflet可視化の作成に失敗: {result.stderr}")
+            
+            # Google Maps版を作成
+            gmaps_cmd = [
+                sys.executable, 
+                str(PROJECT_ROOT / 'scripts/create_google_maps_visualization.py'),
+                '--output-dir', str(viz_output_dir),
+                '--csv-path', str(args.output_path)
+            ]
+            
+            result = subprocess.run(gmaps_cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info("✅ Google Maps可視化を作成しました")
+            else:
+                logger.warning(f"Google Maps可視化の作成に失敗: {result.stderr}")
+                
+        except Exception as e:
+            logger.warning(f"可視化作成中にエラーが発生: {e}")
+    
+    progress_logger.info("=== ✅ 古河道候補地特定専用スクリプト完了 ===")
 
 
 if __name__ == "__main__":
