@@ -184,7 +184,7 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex_dict=None, regex=None, in
                 key_gdf = osm.get_data_by_custom_criteria(
                     custom_filter={key: True}
                 )
-                if not key_gdf.empty:
+                if key_gdf is not None and not key_gdf.empty:
                     gdfs.append(key_gdf)
                     print(f"{key}: {len(key_gdf)}件")
             except Exception as e:
@@ -204,26 +204,64 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex_dict=None, regex=None, in
         
         print(f"初期取得: {len(gdf)}件の地物")
         
+        # デバッグ: データの構造を確認
+        if not gdf.empty:
+            available_name_cols = [col for col in NAME_COLS if col in gdf.columns]
+            print(f"利用可能な名前列: {available_name_cols}")
+            print(f"全ての列: {list(gdf.columns)}")
+            
+            # 名前データがある行の数を確認
+            name_data_count = 0
+            for col in available_name_cols:
+                non_null_count = gdf[col].notna().sum()
+                if non_null_count > 0:
+                    name_data_count += non_null_count
+                    print(f"  {col}: {non_null_count}件の非NULL値")
+            print(f"名前データを持つ総エントリ数: {name_data_count}")
+            
+            # tagsカラムの調査
+            if 'tags' in gdf.columns:
+                print("tagsカラムの内容をサンプル調査:")
+                for i, row in gdf.head(3).iterrows():
+                    tags = row.get('tags', {})
+                    if isinstance(tags, dict):
+                        tag_keys = list(tags.keys())
+                        print(f"  行{i}: tags keys = {tag_keys}")
+                        # nameに関連するキーを探す
+                        name_related = [k for k in tag_keys if 'name' in k.lower()]
+                        if name_related:
+                            print(f"    name関連キー: {name_related}")
+                            for nk in name_related:
+                                print(f"      {nk}: {tags[nk]}")
+                    else:
+                        print(f"  行{i}: tags = {tags} (型: {type(tags)})")
+        
         # 語彙フィルタリング用の正規表現を決定
         if regex_dict is not None:
             # 新形式：カテゴリ別辞書
             print(f"カテゴリ別フィルタリングを実行: {list(regex_dict.keys())}")
             
-            # カテゴリ別マッチング
-            gdf['matched_categories'] = gdf.apply(lambda row: _has_toponym_by_category(row, regex_dict), axis=1)
-            
-            # いずれかのカテゴリにマッチした地物のみを保持
-            gdf = gdf[gdf['matched_categories'].apply(lambda x: len(x) > 0)]
-            
-            # プライマリカテゴリを設定（複数マッチの場合は最初のもの）
-            gdf['root_category'] = gdf['matched_categories'].apply(lambda x: x[0] if x else None)
-            
-            print(f"カテゴリ別フィルタ後: {len(gdf)}件")
-            
-            # カテゴリ別統計
-            if not gdf.empty:
-                category_counts = gdf['root_category'].value_counts()
-                print(f"カテゴリ別件数: {category_counts.to_dict()}")
+            # 特別なケース: 'all'カテゴリが含まれる場合はフィルタリングをスキップ
+            if 'all' in regex_dict:
+                print("'all'カテゴリが検出されたため、フィルタリングをスキップします")
+                gdf['root_category'] = 'all'
+                print(f"フィルタリングスキップ後: {len(gdf)}件")
+            else:
+                # カテゴリ別マッチング
+                gdf['matched_categories'] = gdf.apply(lambda row: _has_toponym_by_category(row, regex_dict), axis=1)
+                
+                # いずれかのカテゴリにマッチした地物のみを保持
+                gdf = gdf[gdf['matched_categories'].apply(lambda x: len(x) > 0)]
+                
+                # プライマリカテゴリを設定（複数マッチの場合は最初のもの）
+                gdf['root_category'] = gdf['matched_categories'].apply(lambda x: x[0] if x else None)
+                
+                print(f"カテゴリ別フィルタ後: {len(gdf)}件")
+                
+                # カテゴリ別統計
+                if not gdf.empty:
+                    category_counts = gdf['root_category'].value_counts()
+                    print(f"カテゴリ別件数: {category_counts.to_dict()}")
         
         elif regex is not None:
             # 旧形式：単一パターン（後方互換性）
@@ -259,6 +297,38 @@ def extract_toponyms_pyrosm(bbox, pbf_path=None, regex_dict=None, regex=None, in
                 if row.get(col) and pd.notna(row.get(col)):
                     name = str(row[col])
                     break
+            
+            # nameが見つからない場合の代替手段（意味のある名前のみ）
+            if not name:
+                # 1. 通常の代替カラムをチェック
+                meaningful_sources = {
+                    'ref': lambda x: x if x and len(x) <= 15 and not x.lower() in ['yes', 'no', 'true', 'false'] else None,  # 道路番号など
+                    'addr:street': lambda x: x,  # 住所の通り名
+                    'addr:city': lambda x: x,    # 住所の市名
+                    'official_name': lambda x: x, # 公式名
+                    'short_name': lambda x: x,   # 短縮名
+                    'local_name': lambda x: x,   # 地域名
+                }
+                
+                for alt_col, validator in meaningful_sources.items():
+                    if row.get(alt_col) and pd.notna(row.get(alt_col)):
+                        alt_value = str(row[alt_col]).strip()
+                        validated_name = validator(alt_value)
+                        if validated_name and len(validated_name) > 1:
+                            name = validated_name
+                            break
+                
+                # 2. tagsカラムから名前を抽出
+                if not name and row.get('tags') and isinstance(row['tags'], dict):
+                    tags = row['tags']
+                    # tagsの中から名前関連のキーを探す
+                    tag_name_sources = ['name', 'name:ja', 'name:pt', 'name:en', 'alt_name', 'old_name', 'loc_name', 'ref']
+                    for tag_key in tag_name_sources:
+                        if tag_key in tags and tags[tag_key]:
+                            tag_value = str(tags[tag_key]).strip()
+                            if len(tag_value) > 1 and tag_value.lower() not in ['yes', 'no', 'true', 'false']:
+                                name = tag_value
+                                break
             
             if name:
                 # ジオメトリの処理
