@@ -25,6 +25,7 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 from tamagawa_to_z.dataset.splitter import DataSplitter
 from tamagawa_to_z.tuning.real_optuna_hybrid import RealHybridBO
 from tamagawa_to_z.tuning.real_pipeline_runner import PipelineRunnerConfig
+from tamagawa_to_z.config.region_config import RegionConfig, add_region_argument
 
 # ロギング設定
 logging.basicConfig(
@@ -73,33 +74,74 @@ def create_base_config(args) -> dict:
     """コマンドライン引数からベース設定を作成"""
     
     if args.test_config:
-        # テスト用設定（高速）
+        # テスト用設定（高速）- 地域設定よりも優先
         config = PipelineRunnerConfig.create_test_config()
         logger.info("Using test configuration (fast mode)")
+        
+        # テストモードでは明示的に指定されたパラメータのみ上書きを許可
+        if args.bbox:
+            config["bbox"] = args.bbox
+            logger.info(f"Test mode: Custom bbox override: {args.bbox}")
+        
+        if args.pbf_path:
+            config["pbf-path"] = args.pbf_path
+            logger.info(f"Test mode: Custom PBF path override: {args.pbf_path}")
+        
+        if args.rivers_path:
+            config["rivers-path"] = args.rivers_path
+            logger.info(f"Test mode: Custom rivers path override: {args.rivers_path}")
+        
+        if args.gsw_path:
+            config["gsw-path"] = args.gsw_path
+            logger.info(f"Test mode: Custom GSW path override: {args.gsw_path}")
+        
+        if args.skip_water_freq:
+            config["skip-water-freq"] = True
+            logger.info("Test mode: Water frequency calculation will be skipped")
     else:
-        # 本格的な設定
+        # 地域に基づいた設定を作成
         project_root = Path(__file__).parent.parent
-        config = PipelineRunnerConfig.create_amazon_config(project_root)
-        logger.info("Using full Amazon configuration")
+        config = create_region_config(args.region, project_root)
+        logger.info(f"Using {args.region} region configuration")
+        
+        # カスタム設定で上書き
+        if args.bbox:
+            config["bbox"] = args.bbox
+            logger.info(f"Custom bbox: {args.bbox}")
+        
+        if args.pbf_path:
+            config["pbf-path"] = args.pbf_path
+        
+        if args.rivers_path:
+            config["rivers-path"] = args.rivers_path
+        
+        if args.gsw_path:
+            config["gsw-path"] = args.gsw_path
+        
+        if args.skip_water_freq:
+            config["skip-water-freq"] = True
+            logger.info("Water frequency calculation will be skipped")
     
-    # カスタム設定で上書き
-    if args.bbox:
-        config["bbox"] = args.bbox
-        logger.info(f"Custom bbox: {args.bbox}")
+    return config
+
+
+def create_region_config(region: str, project_root: Path) -> dict:
+    """地域設定に基づいてパイプライン設定を作成"""
+    region_config = RegionConfig()
+    data_root = project_root / 'data/raw'
     
-    if args.pbf_path:
-        config["pbf-path"] = args.pbf_path
+    config = {
+        "bbox": region_config.get_bbox(region),
+        "pbf-path": str(region_config.get_osm_pbf_path(region, data_root)),
+        "rivers-path": str(region_config.get_hydrorivers_path(region, data_root)),
+        "gsw-path": str(region_config.get_gsw_occurrence_path(region, data_root)),
+        "output-path": str(project_root / 'data/output/candidates/paleochannel_candidates.csv'),
+        "quiet": True,
+        "no-visualize": True,
+        "precompute-only": False
+    }
     
-    if args.rivers_path:
-        config["rivers-path"] = args.rivers_path
-    
-    if args.gsw_path:
-        config["gsw-path"] = args.gsw_path
-    
-    if args.skip_water_freq:
-        config["skip-water-freq"] = True
-        logger.info("Water frequency calculation will be skipped")
-    
+    logger.info(f"地域 {region} の設定を作成: BBOX={config['bbox']}")
     return config
 
 
@@ -110,16 +152,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用例:
-  # 基本実行（アマゾン地域、フル設定）
-  python run_real_optuna.py --trials 20 --sites data/known/known_acre.kmz
+  # 基本実行（Acre州）
+  python run_real_optuna.py --region acre --trials 20 --sites data/known/known_acre.kmz
+  
+  # マラジオ島で実行
+  python run_real_optuna.py --region marajo --trials 20 --sites data/known/known_marajo.kmz
   
   # テスト実行（高速、少数試行）
-  python run_real_optuna.py --trials 3 --test-config --timeout 300
-  
-  # カスタムBBOX
-  python run_real_optuna.py --bbox -70.5 -11.5 -66.5 -8.5 --trials 10
+  python run_real_optuna.py --region acre --trials 3 --test-config --timeout 300
         """
     )
+    
+    # 地域引数を追加
+    parser = add_region_argument(parser)
     
     # 基本パラメータ
     parser.add_argument(
@@ -131,8 +176,8 @@ def main():
     
     parser.add_argument(
         '--sites', '-s',
-        required=True,
-        help='既知遺跡ファイル (.kmz/.csv/.gpkg)'
+        default=None,  # 地域設定から自動取得
+        help='既知遺跡ファイル (.kmz/.csv/.gpkg) (地域設定を上書き)'
     )
     
     # 設定ファイル
@@ -204,6 +249,19 @@ def main():
     
     args = parser.parse_args()
     
+    # 地域設定を適用
+    region_config = RegionConfig()
+    data_root = Path(__file__).resolve().parents[1] / 'data'
+    
+    if args.sites is None:
+        try:
+            args.sites = str(region_config.get_known_sites_path(args.region, data_root / 'raw'))
+            logger.info(f"🌍 地域 {args.region} の既知遺跡ファイル: {args.sites}")
+        except Exception as e:
+            logger.error(f"地域設定からの既知遺跡ファイル取得に失敗: {e}")
+            logger.error("--sitesオプションで明示的に指定してください")
+            sys.exit(1)
+    
     # ロギングレベル設定
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -214,6 +272,7 @@ def main():
     script_path = Path(__file__).parent / "run_site_identification.py"
     
     logger.info("=== Real Optuna 最適化開始 ===")
+    logger.info(f"🌍 対象地域: {args.region}")
     logger.info(f"試行回数: {args.trials}")
     logger.info(f"既知サイト: {sites_file}")
     logger.info(f"Optuna設定: {optuna_config}")
@@ -223,6 +282,7 @@ def main():
         # 入力ファイル確認
         if not sites_file.exists():
             logger.error(f"既知サイトファイルが見つかりません: {sites_file}")
+            logger.error("ファイルを作成するか、--sitesオプションで正しいパスを指定してください")
             sys.exit(1)
         
         if not optuna_config.exists():

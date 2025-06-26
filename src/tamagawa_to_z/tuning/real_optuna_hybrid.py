@@ -496,16 +496,26 @@ class RealHybridBO:
         
         # ベース設定追加
         for key, value in self.base_config.items():
-            if isinstance(value, list):
+            if key in ['precompute-only', 'quiet', 'no-visualize']:
+                # 事前計算専用オプションは既に追加済みなのでスキップ
+                continue
+            elif isinstance(value, list):
+                # BBOXのような複数値オプション
                 cmd.extend([f"--{key}"] + [str(v) for v in value])
             elif isinstance(value, bool):
+                # フラグオプション
                 if value:
                     cmd.append(f"--{key}")
-            else:
+            elif value is not None:
+                # 通常のキー=値オプション
                 cmd.extend([f"--{key}", str(value)])
         
         try:
-            logger.info(f"Executing pre-computation command: {' '.join(cmd[:5])}...")
+            logger.info(f"Executing pre-computation command: {' '.join(cmd[:10])}...")
+            logger.debug(f"Full command: {' '.join(cmd)}")
+            logger.info(f"Working directory: {Path(self.script_path).parent.parent}")
+            logger.info(f"Expected output file: {candidates_csv}")
+            
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -514,11 +524,49 @@ class RealHybridBO:
                 cwd=Path(self.script_path).parent.parent
             )
             
+            logger.info(f"Pre-computation return code: {result.returncode}")
+            if result.stdout:
+                logger.debug(f"Pre-computation stdout: {result.stdout[-500:]}")  # 最後の500文字のみ
+            if result.stderr:
+                logger.warning(f"Pre-computation stderr: {result.stderr[-500:]}")  # 最後の500文字のみ
+            
             if result.returncode != 0:
                 raise RuntimeError(f"Pre-computation failed: {result.stderr}")
             
             # 事前計算結果を読み込み
-            self.precomputed_candidates = pd.read_csv(candidates_csv)
+            if not candidates_csv.exists():
+                # フォールバック: デフォルトの出力パスもチェック
+                fallback_path = Path(self.base_config.get('output-path', 'data/output/candidates/paleochannel_candidates.csv'))
+                if fallback_path.exists():
+                    logger.warning(f"Pre-computation output found at fallback path: {fallback_path}")
+                    self.precomputed_candidates = pd.read_csv(fallback_path)
+                else:
+                    raise RuntimeError(f"Pre-computation output file not created: {candidates_csv}")
+            else:
+                self.precomputed_candidates = pd.read_csv(candidates_csv)
+            
+            # データの基本検証
+            if len(self.precomputed_candidates) == 0:
+                raise RuntimeError("Pre-computation produced empty results")
+                
+            logger.info(f"Pre-computed data columns: {list(self.precomputed_candidates.columns)}")
+            
+            # 必要な列の確認
+            required_cols = ['name', 'type']
+            missing_cols = [col for col in required_cols if col not in self.precomputed_candidates.columns]
+            if missing_cols:
+                logger.warning(f"Missing expected columns: {missing_cols}")
+            
+            # 距離・水域頻度列の確認
+            has_distance = ('dist_km' in self.precomputed_candidates.columns or 
+                          'distance_to_river_km' in self.precomputed_candidates.columns)
+            has_occurrence = ('occ_pct' in self.precomputed_candidates.columns or 
+                            'water_occurrence_pct' in self.precomputed_candidates.columns)
+            
+            if not has_distance:
+                logger.warning("No distance column found in pre-computed data")
+            if not has_occurrence:
+                logger.warning("No water occurrence column found in pre-computed data")
             
             # メトリクス読み込み（必要に応じて）
             if metrics_json.exists():

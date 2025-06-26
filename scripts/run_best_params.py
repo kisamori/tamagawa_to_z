@@ -30,6 +30,7 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from tamagawa_to_z.dataset.splitter import DataSplitter
 from tamagawa_to_z.tuning.pipeline_runner import run_pipeline_with_params
+from tamagawa_to_z.config.region_config import RegionConfig, add_region_argument
 
 # ロギング設定
 logging.basicConfig(
@@ -737,6 +738,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
+    # 地域引数を追加
+    parser = add_region_argument(parser)
+    
     parser.add_argument(
         '--params', '-p',
         required=True,
@@ -749,8 +753,8 @@ def main():
     )
     parser.add_argument(
         '--sites', '-s',
-        default='data/known/known_acre.kmz',
-        help='遺跡ファイルパス (.kmz/.csv/.gpkg) (デフォルト: data/known/known_acre.kmz)'
+        default=None,  # 地域設定から取得
+        help='遺跡ファイルパス (.kmz/.csv/.gpkg) (地域設定を上書き)'
     )
     parser.add_argument(
         '--output', '-o',
@@ -789,6 +793,18 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # 地域設定を適用
+    region_config = RegionConfig()
+    data_root = Path(__file__).resolve().parents[1] / 'data'
+    
+    if args.sites is None:
+        try:
+            args.sites = str(region_config.get_known_sites_path(args.region, data_root / 'raw'))
+            logger.info(f"🌍 地域 {args.region} の既知遺跡ファイル: {args.sites}")
+        except Exception as e:
+            logger.warning(f"地域設定からの既知遺跡ファイル取得に失敗: {e}")
+            logger.warning("--sitesオプションで明示的に指定してください")
     
     # パスオブジェクトに変換
     params_json = Path(args.params)

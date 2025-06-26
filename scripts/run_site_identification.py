@@ -31,6 +31,13 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+# PyYAMLのインポート（オプション）
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -62,42 +69,94 @@ from tamagawa_to_z.harmonizer import (
 )
 from tamagawa_to_z.harmonizer.preprocess import DEFAULT_BBOX, extract_toponyms_pyrosm
 from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex, build_all_roots_regex
+from tamagawa_to_z.config.region_config import RegionConfig, add_region_argument
+
+
+def load_run_meta_config(config_path=None):
+    """run_meta.yamlファイルを読み込んでパラメータを取得する"""
+    if config_path is None:
+        config_path = PROJECT_ROOT / 'config/run_meta.yaml'
+    
+    # デフォルト値
+    default_params = {
+        'distance_threshold_km': 3.0,
+        'min_score': 0.3,
+        'water_occurrence_threshold': 5.0
+    }
+    
+    if not HAS_YAML:
+        logger.warning("PyYAMLがインストールされていません。デフォルト値を使用します")
+        return default_params
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        # パラメータセクションから閾値を取得
+        parameters = config.get('parameters', {})
+        
+        result_params = {
+            'distance_threshold_km': parameters.get('distance_threshold_km', default_params['distance_threshold_km']),
+            'min_score': parameters.get('min_score', default_params['min_score']),
+            'water_occurrence_threshold': parameters.get('water_occurrence_threshold', default_params['water_occurrence_threshold'])
+        }
+        
+        logger.info(f"設定ファイルから読み込み完了: {config_path}")
+        logger.info(f"distance_threshold_km: {result_params['distance_threshold_km']}")
+        logger.info(f"water_occurrence_threshold: {result_params['water_occurrence_threshold']}")
+        
+        return result_params
+        
+    except FileNotFoundError:
+        logger.warning(f"設定ファイルが見つかりません: {config_path}")
+        logger.info("デフォルト値を使用します")
+        return default_params
+    except Exception as e:
+        logger.warning(f"設定ファイルの読み込みに失敗: {e}")
+        logger.info("デフォルト値を使用します")
+        return default_params
 
 
 def parse_args():
     """コマンドライン引数をパースする"""
+    # run_meta.yamlから設定を読み込み
+    config_params = load_run_meta_config()
+    
     parser = argparse.ArgumentParser(
         description='古河道候補地特定専用スクリプト(地理空間分析パイプライン)'
     )
     
-    # BBOX オプション
+    # 地域引数を追加
+    parser = add_region_argument(parser)
+    
+    # BBOX オプション（地域設定で上書き可能）
     parser.add_argument(
         '--bbox',
         type=float,
         nargs=4,
         metavar=['LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'],
-        default=list(DEFAULT_BBOX.bounds),
-        help='対象領域のBBOX: lon_min lat_min lon_max lat_max'
+        default=None,  # 地域設定から取得するためNoneに変更
+        help='対象領域のBBOX: lon_min lat_min lon_max lat_max (地域設定を上書き)'
     )
     
-    # データパスの設定
+    # データパスの設定（地域設定で上書き可能）
     parser.add_argument(
         '--rivers-path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp'),
-        help='HydroRIVERSのシェープファイルパス'
+        default=None,  # 地域設定から取得
+        help='HydroRIVERSのシェープファイルパス (地域設定を上書き)'
     )
     parser.add_argument(
         '--gsw-path', 
         type=str, 
-        default=str(PROJECT_ROOT / 'data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif'),
-        help='GSW occurrenceのTIFFファイルパス'
+        default=None,  # 地域設定から取得
+        help='GSW occurrenceのTIFFファイルパス (地域設定を上書き)'
     )
     parser.add_argument(
         '--pbf-path',
         type=str,
-        default=str(PROJECT_ROOT / 'data/raw/osm/norte-latest.osm.pbf'),
-        help='PBFファイルのパス'
+        default=None,  # 地域設定から取得
+        help='PBFファイルのパス (地域設定を上書き)'
     )
     parser.add_argument(
         '--output-path', 
@@ -131,13 +190,13 @@ def parse_args():
     parser.add_argument(
         '--dist-threshold',
         type=float,
-        default=3.0,
+        default=config_params['distance_threshold_km'],
 help='距離閾値(km)。この値より大きい距離の地点を候補とする'
     )
     parser.add_argument(
         '--occ-threshold',
         type=float,
-        default=5.0,
+        default=config_params['water_occurrence_threshold'],
 help='水域出現率閾値(pct)。この値より小さい出現率の地点を候補とする'
     )
     parser.add_argument(
@@ -172,6 +231,52 @@ help='可視化処理を無効にする --visualizeを上書き'
     )
     
     return parser.parse_args()
+
+
+def apply_region_config(args):
+    """地域設定を引数に適用する"""
+    region_config = RegionConfig()
+    data_root = PROJECT_ROOT / 'data/raw'
+    
+    logger.info(f"🌍 地域設定を適用: {args.region}")
+    
+    # 地域情報を表示
+    region_config.print_region_info(args.region)
+    
+    # 設定の検証
+    validation_results = region_config.validate_region_config(args.region, data_root)
+    
+    if not validation_results.get('config_exists', False):
+        raise ValueError(f"地域 {args.region} の設定が見つかりません")
+    
+    # ファイル存在チェック
+    missing_files = []
+    for check_name, exists in validation_results.items():
+        if check_name.endswith('_exists') and not exists:
+            missing_files.append(check_name.replace('_exists', ''))
+    
+    if missing_files:
+        logger.warning(f"⚠️ 見つからないファイル: {missing_files}")
+    
+    # BBOXの設定（コマンドライン引数で上書きされていない場合）
+    if args.bbox is None:
+        args.bbox = region_config.get_bbox(args.region)
+        logger.info(f"📍 BBOX設定: {args.bbox}")
+    
+    # ファイルパスの設定（コマンドライン引数で上書きされていない場合）
+    if args.pbf_path is None:
+        args.pbf_path = str(region_config.get_osm_pbf_path(args.region, data_root))
+        logger.info(f"🗺️ OSM PBF: {args.pbf_path}")
+    
+    if args.rivers_path is None:
+        args.rivers_path = str(region_config.get_hydrorivers_path(args.region, data_root))
+        logger.info(f"🌊 HydroRIVERS: {args.rivers_path}")
+    
+    if args.gsw_path is None:
+        args.gsw_path = str(region_config.get_gsw_occurrence_path(args.region, data_root))
+        logger.info(f"💧 GSW: {args.gsw_path}")
+    
+    return args
 
 
 def check_data_files(rivers_path, gsw_path, skip_water_freq=False):
@@ -569,6 +674,13 @@ def main():
     """メイン処理"""
     args = parse_args()
     
+    # 地域設定を適用
+    try:
+        args = apply_region_config(args)
+    except Exception as e:
+        logger.error(f"地域設定の適用に失敗: {e}")
+        return
+    
     # quiet モードでもログレベルを調整（ERRORは表示、INFOは重要なもののみ）
     if args.quiet:
         # 重要な進捗情報は表示、詳細ログは抑制
@@ -622,25 +734,61 @@ def main():
     
     # S-4: 現河道との距離計算
     progress_logger.info("=== 📏 S-4: 現河道との距離計算 ===")
-    names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
-    progress_logger.info(f"   ✅ {len(names)} 件の距離を計算")
+    try:
+        progress_logger.info(f"HydroRIVERSファイルから距離を計算中: {args.rivers_path}")
+        names = step4_calculate_distance(names, args.rivers_path, visualize=args.visualize and not args.no_visualize, output_dir=viz_output_dir)
+        progress_logger.info(f"   ✅ {len(names)} 件の距離を計算")
+    except Exception as e:
+        progress_logger.error(f"   ❌ 距離計算エラー: {e}")
+        # デフォルト値で継続
+        names['dist_km'] = 999.0  # 非常に大きな距離値
+        progress_logger.info("   🔄 フォールバック: デフォルト距離値999.0kmを設定")
     
     # 事前計算モード：S-4で停止し、水域頻度も計算して全データを出力
     if args.precompute_only:
         progress_logger.info("=== 🔄 事前計算モード: 水域頻度計算中 ===")
         # 水域頻度を追加（threshold適用前の全データに対して）
         if not args.skip_water_freq and os.path.exists(args.gsw_path):
-            names = water_occurrence(names, args.gsw_path)
-            progress_logger.info(f"   ✅ {len(names)} 件の水域頻度を計算")
+            try:
+                progress_logger.info(f"GSWファイルから水域頻度を計算中: {args.gsw_path}")
+                names = water_occurrence(names, args.gsw_path)
+                progress_logger.info(f"   ✅ {len(names)} 件の水域頻度を計算")
+            except Exception as e:
+                progress_logger.error(f"   ❌ 水域頻度計算エラー: {e}")
+                progress_logger.info("   🔄 フォールバック: デフォルト値0.0を設定")
+                names['water_occurrence_pct'] = 0.0
         else:
             # GSWデータが無い場合は0で埋める
             names['water_occurrence_pct'] = 0.0
             progress_logger.info("   ⚠️ 水域頻度計算をスキップ（デフォルト値0.0を設定）")
         
+        # 列名をRealHybridBOが期待する形式に統一
+        if 'distance_to_river_km' in names.columns and 'dist_km' not in names.columns:
+            names['dist_km'] = names['distance_to_river_km']
+        if 'water_occurrence_pct' in names.columns and 'occ_pct' not in names.columns:
+            names['occ_pct'] = names['water_occurrence_pct']
+        
+        # 出力ディレクトリの作成
+        output_dir = os.path.dirname(args.output_path)
+        if output_dir:  # ディレクトリパスが空でない場合のみ作成
+            os.makedirs(output_dir, exist_ok=True)
+        
         # 全データを保存（threshold適用前）
-        save_results(names, args.output_path)
-        progress_logger.info(f"💾 事前計算結果を保存: {args.output_path}")
-        progress_logger.info(f"   📊 総件数: {len(names)} 件（threshold適用前）")
+        try:
+            names.to_csv(args.output_path, index=False)
+            progress_logger.info(f"💾 事前計算結果を保存: {args.output_path}")
+            progress_logger.info(f"   📊 総件数: {len(names)} 件（threshold適用前）")
+            
+            # ファイルが正しく作成されたかを確認
+            if os.path.exists(args.output_path):
+                file_size = os.path.getsize(args.output_path)
+                progress_logger.info(f"   📁 ファイルサイズ: {file_size} bytes")
+            else:
+                progress_logger.error(f"   ❌ ファイル作成に失敗: {args.output_path}")
+                
+        except Exception as e:
+            progress_logger.error(f"   ❌ CSVファイル保存エラー: {e}")
+            raise
         
         # メトリクス出力
         if args.output_metrics_json:
@@ -650,8 +798,8 @@ def main():
                 'total_toponyms': len(names),
                 'bbox': args.bbox,
                 'timestamp': datetime.now().isoformat(),
-                'has_distance': 'distance_to_river_km' in names.columns,
-                'has_water_occurrence': 'water_occurrence_pct' in names.columns
+                'has_distance': 'dist_km' in names.columns,
+                'has_water_occurrence': 'occ_pct' in names.columns
             }
             with open(args.output_metrics_json, 'w', encoding='utf-8') as f:
                 json.dump(metrics, f, ensure_ascii=False, indent=2)

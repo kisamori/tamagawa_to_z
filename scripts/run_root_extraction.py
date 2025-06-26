@@ -57,6 +57,7 @@ from tamagawa_to_z.harmonizer.preprocess import (
     make_bbox_gdf, extract_toponyms_pyrosm, process_toponyms, DEFAULT_BBOX
 )
 from tamagawa_to_z.harmonizer.llm_layer.root_io import build_water_regex, build_root_regex
+from tamagawa_to_z.config.region_config import RegionConfig, add_region_argument
 
 # 環境変数読み込み
 try:
@@ -166,22 +167,25 @@ def parse_args():
         description='水関連語彙辞書作成と語根抽出専用スクリプト'
     )
     
-    # BBOX オプション
+    # 地域引数を追加
+    parser = add_region_argument(parser)
+    
+    # BBOX オプション（地域設定で上書き可能）
     parser.add_argument(
         '--bbox',
         type=float,
         nargs=4,
         metavar=('LON_MIN', 'LAT_MIN', 'LON_MAX', 'LAT_MAX'),
-        default=list(DEFAULT_BBOX.bounds),
-        help='対象領域のBBOX (lon_min lat_min lon_max lat_max)'
+        default=None,  # 地域設定から取得
+        help='対象領域のBBOX (lon_min lat_min lon_max lat_max) (地域設定を上書き)'
     )
     
-    # Pyrosmオプション
+    # Pyrosmオプション（地域設定で上書き可能）
     parser.add_argument(
         '--pbf-path',
         type=str,
-        default=str(PROJECT_ROOT / 'data/raw/osm/norte-latest.osm.pbf'),
-        help='PBFファイルのパス'
+        default=None,  # 地域設定から取得
+        help='PBFファイルのパス (地域設定を上書き)'
     )
     
     # LLMオプション
@@ -271,6 +275,29 @@ def parse_args():
     )
     
     return parser.parse_args()
+
+
+def apply_region_config(args):
+    """地域設定を引数に適用する"""
+    region_config = RegionConfig()
+    data_root = PROJECT_ROOT / 'data/raw'
+    
+    logger.info(f"🌍 地域設定を適用: {args.region}")
+    
+    # 地域情報を表示
+    region_config.print_region_info(args.region)
+    
+    # BBOXの設定（コマンドライン引数で上書きされていない場合）
+    if args.bbox is None:
+        args.bbox = region_config.get_bbox(args.region)
+        logger.info(f"📍 BBOX設定: {args.bbox}")
+    
+    # PBFファイルパスの設定（コマンドライン引数で上書きされていない場合）
+    if args.pbf_path is None:
+        args.pbf_path = str(region_config.get_osm_pbf_path(args.region, data_root))
+        logger.info(f"🗺️ OSM PBF: {args.pbf_path}")
+    
+    return args
 
 
 def load_osm_keys_config(config_path, mode='standard'):
@@ -882,6 +909,13 @@ def save_results(names, new_root_analysis, output_dir, merge_roots=True):
 def main():
     """メイン処理"""
     args = parse_args()
+    
+    # 地域設定を適用
+    try:
+        args = apply_region_config(args)
+    except Exception as e:
+        logger.error(f"地域設定の適用に失敗: {e}")
+        return
     
     logger.info("=== 🎯 辞書作成と語根抽出専用スクリプト開始 ===")
     

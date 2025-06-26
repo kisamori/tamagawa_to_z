@@ -1,0 +1,50 @@
+# 地域別設定ファイル
+# 使用方法: --region acre または --region marajo
+
+regions:
+  acre:
+    name: "Acre State, Brazil"
+    description: "アマゾン西部アクレ州"
+    bbox: [-70.5, -11.5, -66.5, -8.5]  # [lon_min, lat_min, lon_max, lat_max]
+    osm:
+      pbf_file: "norte-latest.osm.pbf"
+    hydrorivers:
+      shapefile: "hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp"
+    gsw:
+      occurrence_file: "GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif"
+      # 複数タイルの場合（将来対応）
+      # occurrence_files:
+      #   - "GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif"
+    known_sites:
+      default_file: "known/known_acre.kmz"
+
+  marajo:
+    name: "Marajó Island, Brazil"
+    description: "アマゾン河口マラジオ島"
+    bbox: [-50.5, -1.5, -48.5, 0.5]  # [lon_min, lat_min, lon_max, lat_max] - より正確な範囲
+    osm:
+      pbf_file: "norte-latest.osm.pbf"  # マラジオ島は北部地域に含まれる
+    hydrorivers:
+      shapefile: "hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp"
+    gsw:
+      occurrence_file: "GSW_occurrence/occurrence_50W_0Nv1_4_2021.tif"  # メイン座標範囲をカバー
+      # 複数タイルの場合（将来対応）
+      occurrence_files:
+        - "GSW_occurrence/occurrence_50W_0Nv1_4_2021.tif"
+    known_sites:
+      default_file: "known/known_marajo.kmz"
+
+# デフォルト地域（既存の動作を維持）
+default_region: "acre"
+
+# 地域設定の検証ルール
+validation:
+  required_fields:
+    - "bbox"
+    - "osm.pbf_file"
+    - "hydrorivers.shapefile" 
+    - "gsw.occurrence_file"
+  bbox_format: "[lon_min, lat_min, lon_max, lat_max]"
+  coordinate_ranges:
+    longitude: [-180, 180]
+    latitude: [-90, 90]
