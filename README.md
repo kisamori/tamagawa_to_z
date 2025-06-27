@@ -39,22 +39,14 @@
 
 ### 約束の地： Ramal Olho D'água
 
-**📍 Ramal Olho D'água 位置情報**
-
-[![Ramal Olho D'água の位置](https://maps.googleapis.com/maps/api/staticmap?center=-9.839247,-68.498725&zoom=12&size=640x400&maptype=satellite&markers=color:red%7Clabel:R%7C-9.839247,-68.498725&format=png)](https://www.google.com/maps/d/u/0/edit?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI&usp=sharing)
-
-*📌 クリックすると詳細なインタラクティブマップが開きます*
-
-**地図で確認:**
-- 🗺️ [詳細マップ（Google My Maps）](https://www.google.com/maps/d/u/0/edit?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI&usp=sharing)
-- 🌍 [Google Maps で開く](https://www.google.com/maps?q=-9.839247,-68.498725)
-
 数多の分析と、AIとの対話の末、我々はついに一つの場所にたどり着いた。
 
 | サイト名 | Ramal Olho D'água |
 | :--- | :--- |
 | **座標** | **-9.839247, -68.498725** |
-| 複合スコア | 0.0751 |
+
+**地図で確認:**
+- 🌍 [Google Maps で開く](https://www.google.com/maps?q=-9.839247,-68.498725)
 
 この場所は、既知の遺跡群からは離れた、まさに“空白地帯“に位置する。
 衛星データは、古代人が集落を築きやすい「微高地」と「低湿地」がモザイク状に広がる、理想的な環境であることを示唆している。
