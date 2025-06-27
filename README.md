@@ -39,6 +39,12 @@
 
 ### 約束の地： Ramal Olho D'água
 
+**📍 Ramal Olho D'água 位置情報**
+
+<iframe src="https://www.google.com/maps/d/u/0/embed?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI" width="640" height="480"></iframe>
+
+*上記の地図では、予測された候補地「Ramal Olho D'água」の位置と周辺の地理的特徴を確認できます。*
+
 数多の分析と、AIとの対話の末、我々はついに一つの場所にたどり着いた。
 
 | サイト名 | Ramal Olho D'água |
