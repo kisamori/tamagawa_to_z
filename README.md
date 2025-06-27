@@ -41,11 +41,13 @@
 
 **📍 Ramal Olho D'água 位置情報**
 
-[![Ramal Olho D'água 位置図](https://via.placeholder.com/640x300/2E8B57/FFFFFF?text=Click+to+View+Interactive+Map)](https://www.google.com/maps/d/u/0/edit?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI&usp=sharing)
+<iframe src="https://www.google.com/maps/d/u/0/embed?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI" width="640" height="480"></iframe>
 
-**[🗺️ インタラクティブマップを開く](https://www.google.com/maps/d/u/0/edit?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI&usp=sharing)**
+**地図で確認:**
+- 🗺️ [詳細マップ（Google My Maps）](https://www.google.com/maps/d/u/0/edit?mid=1xsa0IDFjXSTsndAb65J87PJqwQy-IDI&usp=sharing)
+- 🌍 [Google Maps で開く](https://www.google.com/maps?q=-9.839247,-68.498725)
 
-*上記のリンクから、予測された候補地「Ramal Olho D'água」の位置と周辺の地理的特徴を詳細に確認できます。*
+*上記の地図で、予測された候補地「Ramal Olho D'água」の位置と周辺の地理的特徴を確認できます。地図が表示されない場合は、上記のリンクをご利用ください。*
 
 数多の分析と、AIとの対話の末、我々はついに一つの場所にたどり着いた。
 
