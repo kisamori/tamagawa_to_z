@@ -1,262 +1,275 @@
-# スクリプト実行ガイド
+# Scripts Documentation
 
-このディレクトリには、地名調和処理（ハーモナイゼーション）と古河道候補地特定のためのスクリプトが含まれています。
+このディレクトリには、地名データから考古学的な遺跡候補地を発見・評価するための一連の分析を実行するスクリプトが格納されています。
 
-## 概要
+## ワークフロー概要
 
-処理は2つの主要タスクに分離されています：
+このプロジェクトは、大きく分けて以下の4つのステップで構成されています。各スクリプトは、それぞれのステップで特定の役割を担う専門家のように機能します。
 
-- **Task i)** 辞書作成と語根抽出：LLMハーモナイゼーション、新語根発見
-- **Task ii)** 遺跡候補地特定：地理空間分析パイプライン（S-1～S-5）
+1.  **準備・辞書づくり (Preparation & Dictionary Building)**
+    - 分析の基礎となるデータや、地名を解釈するための辞書を作成します。
+2.  **候補地を探す (Candidate Exploration)**
+    - 地理空間データと地名を照合し、遺跡の可能性がある場所を探索します。
+3.  **候補地を評価・分析する (Candidate Evaluation & Analysis)**
+    - AIや機械学習を用いて、見つかった候補地をスコアリングし、有望な順にランク付けします。
+4.  **全体を効率化・自動化する (Workflow Automation & Optimization)**
+    - 一連の分析フローを統括したり、最適な分析条件を自動で探索したりします。
 
-## スクリプト構成
+---
 
-### 1. run_harmonizer.py（統合実行スクリプト）
-モード選択による統合実行が可能です。
+## 1. 準備・辞書づくり (Preparation & Dictionary Building)
 
-### 2. run_root_extraction.py（辞書・語根管理専用）
-Task i)を独立実行します。
+### `run_root_extraction.py`
 
-### 3. run_site_identification.py（遺跡候補地特定専用）
-Task ii)を独立実行します。
+#### 役割
+**【言葉の辞書を作る人】**
+地名の中から「川」「水辺」など、特定のカテゴリ（水、地形など）に関連する言葉（語根）を見つけ出し、分析の基礎となる単語リストを作成・更新します。
 
-### 前提条件
+#### 主な機能
+- OSM (OpenStreetMap) データから地名を収集します。
+- AI (LLM) を使って収集した地名を分析し、新しい語根の候補を発見します。
+- 既存の語根辞書 (`data/dict/*.csv`) に新しい語根を自動または手動で追加・更新します。
+- カテゴリ別の語根辞書を `all_roots.csv` に統合する機能も持ちます。
 
-- Pythonパッケージがインストールされていること
+#### 使用方法
+- **基本実行（Acre地域の水関連語根を抽出）**
+  ```bash
+  python scripts/run_root_extraction.py --region acre --visualize
   ```
-  cd tamagawa_to_z
-  pip install -e .
+- **カテゴリ別CSVを統合して `all_roots.csv` を作成**
+  ```bash
+  python scripts/run_root_extraction.py --create-all-roots
   ```
-  または
+- **主な引数**
+  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
+  - `--bbox`: 対象のBBox (座標範囲) を手動で指定します。
+  - `--pbf-path`: 使用するOSMのPBFファイルパスを指定します。
+  - `--output-dir`: 結果を出力するディレクトリを指定します。
+  - `--sample-size`: LLM分析にかける地名のサンプル数を指定し、コストを削減します。
+  - `--visualize`: 処理過程で生成される地図などの可視化画像を保存します。
+  - `--create-all-roots`: 他の処理は行わず、カテゴリ別CSVを `all_roots.csv` にマージします。
+
+### `run_split.py`
+
+#### 役割
+**【データ整理の専門家】**
+既知の遺跡データを、機械学習モデルが公平かつ正確に学習・評価できるよう、「訓練用」「検証用」「テスト用」といったグループに分割します。
+
+#### 主な機能
+- 遺跡データを、発見年や地理的な位置に基づいて分割します。
+  - **Train:** モデルの学習用データ
+  - **Validation:** 学習中のモデルの性能評価用データ
+  - **Test-time:** 時間的に新しいデータ（未来のデータに対する性能評価用）
+  - **Test-region:** 地理的に異なる地域のデータ（未知の地域に対する汎化性能評価用）
+- 分割したデータを、それぞれ個別のGISファイル (`.gpkg`) として出力します。
+
+#### 使用方法
+- **基本実行**
+  ```bash
+  python scripts/run_split.py --config configs/dataset_split.yaml --sites data/known/known_acre.kmz --output data/known/split
   ```
-  cd tamagawa_to_z
-  poetry install
+- **主な引数**
+  - `--config`: 分割のルールを定義した設定ファイル (`.yaml`) のパス。
+  - `--sites`: 分割対象となる遺跡データ (`.kmz`, `.csv`, `.gpkg`) のパス。
+  - `--output`: 分割後のファイルを出力するディレクトリのパス。
+  - `--dry-run`: 実際にはファイルを出力せず、分割結果の統計情報のみを表示します。
+
+---
+
+## 2. 候補地を探す (Candidate Exploration)
+
+### `run_site_identification.py`
+
+#### 役割
+**【候補地探しのメイン担当】**
+「**今は川がないのに、名前に『川』と付く場所**」を探し出します。このような場所は、昔の川の跡（古河道）である可能性が高く、遺跡候補地となります。
+
+#### 主な機能
+- 地名データ、現在の河川データ (HydroRIVERS)、過去の水域存在確率データ (GSW) を統合的に分析します。
+- 川からの距離や水域の頻度に基づいて候補地をスコアリングし、リストアップします。
+- Optunaによる最適化の対象となる、コアな分析パイプラインです。
+
+#### 使用方法
+- **基本実行（Acre地域）**
+  ```bash
+  python scripts/run_site_identification.py --region acre --visualize
   ```
+- **パラメータを指定して実行**
+  ```bash
+  python scripts/run_site_identification.py --region acre --dist-threshold 2.5 --occ-threshold 15.0
+  ```
+- **主な引数**
+  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
+  - `--rivers-path`, `--gsw-path`, `--pbf-path`: データパスを個別に指定します。
+  - `--output-path`: 最終的な候補地リスト (`.csv`) の出力先を指定します。
+  - `--dist-threshold`: 「川からこれ以上離れている」という距離のしきい値 (km)。
+  - `--occ-threshold`: 「水があった確率がこれ以下」という水域頻度のしきい値 (%)。
+  - `--visualize`: 候補地の分布図などを画像として保存します。
 
-## 使用方法
+### `run_analyze_site.py`
 
-### 1. 統合実行（推奨）
+#### 役割
+**【既知遺跡の分析官】**
+すでに見つかっている遺跡の周辺では、地名がどのようなパターン（距離や方角）で分布しているかを詳しく分析します。これは、候補地のパターンが「遺跡らしいか」を判断するための基準となります。
 
-**両方のタスクを順次実行:**
-```bash
-python scripts/run_harmonizer.py --mode both
-```
+#### 主な機能
+- 既知の遺跡周辺の地名をOSMから抽出します。
+- 抽出した地名を、遺跡を中心とした極座標（距離と角度）に変換します。
+- 地名と最寄りの川との距離を計算します。
+- 分析結果をCSVファイルに出力し、オプションで可視化も行います。
 
-**辞書管理のみ実行:**
-```bash
-python scripts/run_harmonizer.py --mode root-extraction --sample-size 100
-```
+#### 使用方法
+- **基本実行**
+  ```bash
+  python scripts/run_analyze_site.py --region acre --radius 5.0 --visualize
+  ```
+- **主な引数**
+  - `--region`: 分析対象の地域 (`acre`, `marajo`など) を指定します。
+  - `--radius`: 各遺跡から地名を検索する半径 (km) を指定します。
+  - `--visualize`: 分析結果（地名分布図、極座標プロットなど）を画像として保存します。
+  - `--similarity-analysis`: 抽出したデータを使って、続けて類似度分析を実行します。
 
-**遺跡候補地特定のみ実行:**
-```bash
-python scripts/run_harmonizer.py --mode site-identification --skip-water-freq
-```
+---
 
-### 2. 個別実行
+## 3. 候補地を評価・分析する (Candidate Evaluation & Analysis)
 
-**辞書作成・語根抽出:**
-```bash
-python scripts/run_root_extraction.py --sample-size 50 --visualize
-```
+### `run_similarity_analysis.py`
 
-**古河道候補地特定:**
-```bash
-python scripts/run_site_identification.py --rivers-path data/raw/HydroRIVERS_v10_sa.shp --visualize
-```
+#### 役割
+**【AI鑑定士（スコア付け）】**
+機械学習を使い、見つけた候補地が「既知の遺跡の地名パターンとどれくらい似ているか」を**点数（スコア）付け**し、有望な順にランキングを作成します。さらにAIが「なぜ似ているのか」という理由も解説してくれます。
 
-## 共通オプション
+#### 主な機能
+- 既知遺跡の地名分布から特徴量（距離、密度、方角など）を生成します。
+- 機械学習モデル (kNN, クラスタリング等) を構築し、候補地と既知遺跡との類似度をスコアリングします。
+- 候補地を類似度の高い順にランキングし、結果をCSVやKMZ形式で出力します。
+- OpenAIのLLMを使い、各候補地の類似性の根拠を文章で自動生成します。
 
-### 地理的設定
-- `--bbox LON_MIN LAT_MIN LON_MAX LAT_MAX`: 対象領域のBBOX（デフォルト: `-70.5 -11.5 -66.5 -8.5`）
-- `--pbf-path PATH`: OSM PBFファイルパス（デフォルト: `data/raw/osm/norte-latest.osm.pbf`）
-- `--visualize`: 処理結果を可視化する（OpenStreetMap背景付き画像ファイルとして保存）
-- `--viz-output-dir PATH`: 可視化画像の出力ディレクトリ（デフォルト: `data/plots`）
+#### 使用方法
+- **基本実行（候補地のランキングを作成）**
+  ```bash
+  python scripts/run_similarity_analysis.py --region acre --mode candidate_ranking
+  ```
+- **主な引数**
+  - `--region`: 分析対象の地域 (`acre`, `marajo`など) を指定します。
+  - `--mode`: `candidate_ranking` (候補地を評価) または `similarity_only` (既知遺跡間の類似度のみ評価) を選択します。
+  - `--output-dir`: レポートやランキング結果を出力するディレクトリを指定します。
+  - `--config`: 地域ごとのデータパスを定義した設定ファイル (`.yaml`) を指定します。
 
-### データフィルタリング設定
-- `--include-water-features`: 水域タグを持つ地物も地名候補として含める（デフォルトは除外）
-  
-  **詳細**: デフォルトでは、OSMの水域タグ（`waterway`, `natural=water`, `water`, `wetland`, `riverbank`）を持つ地物は地名候補から除外されます。このオプションを指定すると、これらのタグを持つ地物も地名候補に含まれます。
-  
-  **注意**: 現在の対象地域（アマゾン北部）のOSMデータでは、水域タグを持つ名前付き地物が存在しないため、このオプションの有無による抽出数の変化は見られません。将来的に異なる地域やデータセットを使用する際に有効になる可能性があります。
+### `run_inspector.py`
 
-### データファイル設定
-- `--rivers-path PATH`: HydroRIVERSシェープファイルパス（デフォルト: `data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp`）
-- `--gsw-path PATH`: GSW occurrenceのTIFFファイルパス（デフォルト: `data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif`）
+#### 役割
+**【AI監査官】**
+分析結果全体をチェックし、「この分析はうまくいっているか？」「もっと精度を上げるには、どのパラメータを調整すればいいか？」といった**改善案を提案**します。
 
-## 辞書・語根管理専用オプション（run_root_extraction.py）
+#### 主な機能
+- 候補地データと既知の遺跡データを比較し、Recall（再現率）やmAP（平均適合率）などの評価指標を計算します。
+- 分析結果に基づいて、パラメータ調整などの改善提案を生成します。
+- 分析レポート (Markdown形式) と改善計画 (YAML形式) を出力します。
 
-### LLM・処理設定
-- `--sample-size N`: LLMハーモナイゼーションのサンプルサイズ（コスト削減用）
-- `--output-dir PATH`: 出力ディレクトリ（デフォルト: `data/interim`）
-- `--no-merge-roots`: 新語根の自動マージを無効化する
+#### 使用方法
+- **基本実行**
+  ```bash
+  python scripts/run_inspector.py --candidates data/output/candidates/paleochannel_candidates.csv --known data/known/known_acre.kmz
+  ```
+- **主な引数**
+  - `--candidates`: 評価対象の候補地データ (`.csv`) のパス。
+  - `--known`: 比較基準となる既知の遺跡データ (`.kmz`, `.gpkg`など) のパス。
+  - `--output`: レポートや計画ファイルを出力するディレクトリを指定します。
 
-### OSMキー設定（地名抽出範囲の制御）
-- `--osm-keys-config PATH`: OSMキー設定ファイルのパス（デフォルト: `data/config/osm_keys.yaml`）
-- `--osm-keys-mode MODE`: OSMキー抽出モード（デフォルト: `standard`）
+### `run_researcher.py`
 
-**利用可能なOSMキー抽出モード:**
-- `conservative`: 最小限のキー（place, natural, historic）
-- `standard`: 標準設定（place, landuse, man_made, highway）
-- `extended`: 包括的抽出（上記＋amenity, tourism, leisure, shop, natural, waterway, railway, historic, office, building）
-- `water_focused`: 水関連地名特化（place, natural, waterway, man_made, historic, landuse）
+#### 役割
+**【AI博士】**
+監査官のレポートをさらに深掘りし、「どの改善案が一番効果的か？」「次に何を試すべきか？」という、より具体的な**研究計画を立ててくれる**コンサルタントです。
 
-**OSMキー設定ファイル（osm_keys.yaml）について:**
+#### 主な機能
+- `run_inspector.py` の出力（分析レポートと改善計画）を入力として受け取ります。
+- AI (LLM) を用いて、より掘り下げた考察や、複数の改善案の優先順位付けを行います。
+- 研究レポートと、より詳細な改善計画を出力します。
 
-設定ファイル `data/config/osm_keys.yaml` では、OpenStreetMapから地名を抽出する際に使用するキー（データカテゴリ）を制御できます：
+#### 使用方法
+- **基本実行（最新のInspectorレポートを自動で読み込む）**
+  ```bash
+  python scripts/run_researcher.py
+  ```
+- **主な引数**
+  - `--artefacts`: Inspectorの出力が含まれるディレクトリのパス。指定しない場合、最新のものが自動で選択されます。
+  - `--output`: 研究レポートなどを出力するディレクトリを指定します。
 
-```yaml
-# 抽出モードごとの設定
-extraction_modes:
-  standard:           # デフォルト設定
-    - place           # 村、集落、都市など
-    - landuse         # 土地利用エリア
-    - man_made        # 人工構造物
-    - highway         # 道路・交通インフラ
-  
-  extended:           # より包括的な抽出
-    - place
-    - landuse
-    - man_made
-    - highway
-    - amenity         # 施設・サービス（銀行、レストラン、学校、病院）
-    - tourism         # 観光施設（ホテル、博物館、観光地）
-    - leisure         # レクリエーション施設（公園、スポーツセンター）
-    - shop            # 商業施設（店舗、市場）
-    - natural         # 自然地形（山、丘、洞窟、海岸）
-    - waterway        # 水路関連（川、運河、水路）※水関連地名に特に有用
-    - railway         # 鉄道インフラ（駅、路線、プラットフォーム）
-    - historic        # 歴史的建造物（遺跡、記念碑、考古学的遺跡）
-    - office          # オフィス・行政施設（政府、企業）
-    - building        # 名前付き建物・構造物
-```
+---
 
-**注意事項:**
-- より多くのキーを使用すると包括的な抽出が可能ですが、処理時間が増加し、ノイズも増える可能性があります
-- 水語彙フィルタリングは初期抽出後に適用されるため、抽出されるのは水関連語彙を含む地名のみです
-- 各OSM地物は name, alt_name, old_name, loc_name フィールドのいずれかを持つ必要があります
+## 4. 全体を効率化・自動化する (Workflow Automation & Optimization)
 
-**出力ファイル:**
-- `toponym_harmonization_results.csv`: ハーモナイゼーション済み地名辞書
-- `new_root_analysis.csv`: 新語根分析結果
+### `run_optuna.py`
 
-## 遺跡候補地特定専用オプション（run_site_identification.py）
+#### 役割
+**【最適化の専門家】**
+「川から何km離れた場所を探すか？」といった分析の条件（パラメータ）を、コンピューターが自動で何百回も試行錯誤し、**最も良い結果が出る「黄金のパラメータ」**を見つけ出してくれます。
 
-- `--output-path PATH`: 出力ファイルパス（デフォルト: `data/interim/paleochannel_candidates.csv`）
-- `--skip-water-freq`: 水域頻度計算をスキップ（距離のみで候補抽出）
+#### 主な機能
+- `run_site_identification.py` の分析パイプラインを、パラメータを変えながら繰り返し実行します。
+- 最適化ライブラリOptunaを使い、最も良いスコアが得られるパラメータの組み合わせを探索します。
+- 見つかった最適なパラメータはJSONファイルとして保存され、`run_best_params.py` で利用されます。
 
-**出力ファイル:**
-- `paleochannel_candidates.csv`: 古河道候補地リスト（スコア付き）
+#### 使用方法
+- **基本実行**
+  ```bash
+  python scripts/run_optuna.py --region acre --trials 50 --sites data/known/split/val.gpkg
+  ```
+- **主な引数**
+  - `--region`: 最適化の対象となる地域 (`acre`, `marajo`など) を指定します。
+  - `--trials`: 最適化の試行回数を指定します。
+  - `--sites`: 評価基準となる検証用サイトデータ (`.gpkg`など) のパス。
+  - `--timeout`: 1試行あたりの最大実行時間 (秒) を指定します。
+  - `--resume`: 中断した最適化を再開します。
 
-### 可視化画像（--visualizeオプション使用時）
+### `run_best_params.py`
 
-**出力ディレクトリ構造:**
-```
-data/plots/
-├── site_identification_20231220_143052/    # タイムスタンプ付きディレクトリ
-│   ├── step1_bbox.png
-│   ├── step2_toponyms_distribution.png
-│   ├── step3_type_distribution.png
-│   ├── step4_distance_distribution.png
-│   └── step5_paleochannel_candidates.png
-└── root_extraction_20231220_143105/        # タイムスタンプ付きディレクトリ
-    ├── root_extraction_toponyms_distribution.png
-    └── root_extraction_type_distribution.png
-```
+#### 役割
+**【最終実行者】**
+最適化の専門家 (`run_optuna.py`) が見つけた「黄金のパラメータ」を使って、**最高の条件で最終的な分析を実行**し、結果を評価・可視化します。
 
-**各画像の内容:**
-- `step1_bbox.png`: 対象領域の境界（OpenStreetMap背景付き、英語表記）
-- `step2_toponyms_distribution.png`: 収集したトポニムの分布（OpenStreetMap背景付き、英語表記）
-- `step3_type_distribution.png`: 水系タイプ別の件数（棒グラフ、英語表記）
-- `step4_distance_distribution.png`: 現河道からの距離分布（ヒストグラム、英語表記）
-- `step5_paleochannel_candidates.png`: 古河道候補地点（スコア別色分け、地図背景付き、英語表記）
-- `root_extraction_toponyms_distribution.png`: 地名分布（語根抽出用、OpenStreetMap背景付き、英語表記）
-- `root_extraction_type_distribution.png`: 水系タイプ分布（語根抽出用、棒グラフ、英語表記）
+#### 主な機能
+- Optunaが出力した最適なパラメータ (JSONファイル) を読み込みます。
+- そのパラメータを使って、遺跡候補地の特定とスコアリングを行います。
+- 評価データセット（Validation/Test）に対してスコアを算出し、性能を評価します。
+- オプションで、分析の各ステップや最終的な候補地の分布を詳細に可視化します。
 
-## 処理ステップ
+#### 使用方法
+- **基本実行**
+  ```bash
+  python scripts/run_best_params.py --region acre --params data/output/optuna/best_params.json --sites data/known/known_acre.kmz --visualize
+  ```
+- **主な引数**
+  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
+  - `--params`: Optunaが出力した最良パラメータのJSONファイルパス。
+  - `--sites`: 評価に使用する遺跡データのパス。
+  - `--output`: 評価結果などを出力するディレクトリを指定します。
+  - `--visualize`: 最終結果や分析過程を詳細に可視化します。
 
-### Task i) 辞書作成・語根抽出（run_root_extraction.py）
+### `run_harmonizer.py`
 
-1. **地名収集**: 対象領域からの水関連地名抽出
-2. **基本処理**: 正規化・タイプ推定
-3. **LLMハーモナイゼーション**: 既存辞書との照合、類似度判定
-4. **新語根発見**: パターン分析による未知語根候補抽出
-5. **結果保存**: ハーモナイゼーション結果と新語根分析の保存
+#### 役割
+**【現場監督】**
+これまで説明した複数のスクリプト（辞書作りや候補地探しなど）を、**適切な順番で実行してくれる**まとめ役です。プロジェクト全体のワークフローを統括します。
 
-### Task ii) 遺跡候補地特定（run_site_identification.py）
+#### 主な機能
+- `run_root_extraction.py` と `run_site_identification.py` を内部で呼び出します。
+- `--mode` オプションによって、両方のタスクを実行するか、どちらか一方だけを実行するかを選択できます。
 
-1. **S-1**: 対象地域のBBox定義
-2. **S-2**: 水場系トポニムの抽出（PyrosmでOSMデータ使用）
-3. **S-3**: クレンジング & タイプ付け（LLMなし）
-4. **S-4**: 現河道との距離計算
-5. **S-5**: "川が無いのに川名が残る"ポイント抽出・スコアリング
-
-## 環境設定
-
-### 必須データファイル
-
-1. **OSM PBFファイル**: `data/raw/osm/norte-latest.osm.pbf`
-   - ダウンロード: [Geofabrik](https://download.geofabrik.de/south-america/brazil/norte-latest.osm.pbf)
-
-2. **HydroRIVERS**: `data/raw/hydrorivers_sahydrorivers_sa/HydroRIVERS_v10_sa.shp`
-   - ダウンロード: [HydroSHEDS](https://www.hydrosheds.org/products/hydrorivers)
-
-3. **GSW occurrence**: `data/raw/GSW_occurrence/occurrence_70W_10Sv1_4_2021.tif`
-   - ダウンロード: [Global Surface Water](https://global-surface-water.appspot.com/download)
-
-### OpenAI API設定（辞書管理用）
-
-```bash
-# .envファイルに設定
-OPENAI_API_KEY=your_api_key_here
-```
-
-## 実行例とコスト管理
-
-### 低コスト実行（開発・テスト用）
-```bash
-# 辞書管理のみ、少量サンプル
-python scripts/run_root_extraction.py --sample-size 20
-
-# 遺跡候補地特定のみ、水域頻度計算スキップ
-python scripts/run_site_identification.py --skip-water-freq
-
-# 水域タグを持つ地物も含めて地名抽出
-python scripts/run_root_extraction.py --include-water-features --sample-size 20
-
-# 保守的モードで最小限のキーを使用
-python scripts/run_root_extraction.py --osm-keys-mode conservative --sample-size 20
-
-# 水関連地名特化モードを使用
-python scripts/run_root_extraction.py --osm-keys-mode water_focused --sample-size 20
-```
-
-### 本格実行
-```bash
-# 辞書管理＋遺跡候補地特定の統合実行
-python scripts/run_harmonizer.py --mode both --sample-size 200 --visualize
-
-# 水域タグを持つ地物も含めて統合実行
-python scripts/run_harmonizer.py --mode both --include-water-features --sample-size 200 --visualize
-
-# 包括的抽出モードで辞書管理を実行
-python scripts/run_root_extraction.py --osm-keys-mode extended --sample-size 100 --visualize
-
-# カスタムOSMキー設定ファイルを使用
-python scripts/run_root_extraction.py --osm-keys-config custom_osm_keys.yaml --sample-size 100
-```
-
-### ログ出力
-
-すべてのスクリプトは実行中の進捗状況や結果をログとして出力します。ログレベルはデフォルトで`INFO`に設定されています。
-
-### エラーハンドリング
-
-入力データファイルが存在しない場合は警告を表示し、可能な処理のみ実行します。スクリプトは段階的に処理を進めるため、一部のステップが失敗しても後続処理を継続します。
-
-## トラブルシューティング
-
-1. **Pyrosmエラー**: OSM PBFファイルのパスを確認
-2. **LLM実行エラー**: OpenAI APIキーの設定を確認
-3. **メモリ不足**: `--sample-size`でLLM処理データを削減
-4. **距離計算エラー**: HydroRIVERSファイルの存在を確認
-5. **地図背景エラー**: `poetry install`でcontextilyがインストールされているか確認
+#### 使用方法
+- **両方のタスクを実行**
+  ```bash
+  python scripts/run_harmonizer.py --mode both
+  ```
+- **辞書管理のみ実行**
+  ```bash
+  python scripts/run_harmonizer.py --mode root-extraction
+  ```
+- **サイト特定のみ実行**
+  ```bash
+  python scripts/run_harmonizer.py --mode site-identification
+  ```
+- **主な引数**
+  - `--mode`: `both`, `root-extraction`, `site-identification` から実行モードを選択します。
