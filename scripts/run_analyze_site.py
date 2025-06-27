@@ -59,7 +59,8 @@ sys.path.append(str(PROJECT_ROOT))
 # 自作パッケージのインポート
 try:
     from tamagawa_to_z.site_analysis import (
-        ToponymExtractor, PolarConverter, RiverDistanceCalculator, CSVExporter
+        ToponymExtractor, PolarConverter, RiverDistanceCalculator, CSVExporter,
+        ArchaeologicalSimilarityAnalyzer
     )
 except ImportError as e:
     print(f"Error: 必要なモジュールのインポートに失敗しました: {e}")
@@ -338,6 +339,32 @@ def main():
     )
     
     parser.add_argument(
+        '--similarity-analysis',
+        action='store_true',
+        help='類似度分析を実行（機械学習による遺跡候補地スコアリング）'
+    )
+    
+    parser.add_argument(
+        '--cluster-sites',
+        action='store_true',
+        default=True,
+        help='近接遺跡をクラスタリングして統合（デフォルト: True）'
+    )
+    
+    parser.add_argument(
+        '--no-cluster-sites',
+        action='store_true',
+        help='近接遺跡のクラスタリングを無効化'
+    )
+    
+    parser.add_argument(
+        '--cluster-distance',
+        type=float,
+        default=200.0,
+        help='クラスタリング距離（メートル、デフォルト: 200m）'
+    )
+    
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='デバッグモードで実行'
@@ -419,8 +446,17 @@ def main():
         
         # 2. 地名抽出
         logger.info("遺跡周辺地名を抽出中...")
+        
+        # クラスタリング設定
+        cluster_sites = args.cluster_sites and not args.no_cluster_sites
+        cluster_distance_m = args.cluster_distance
+        
         toponyms_gdf = extractor.extract_toponyms_around_sites(
-            sites_gdf, radius_km, args.osm_keys_mode
+            sites_gdf, 
+            radius_km, 
+            args.osm_keys_mode,
+            cluster_sites=cluster_sites,
+            cluster_distance_m=cluster_distance_m
         )
         
         if toponyms_gdf.empty:
@@ -516,6 +552,54 @@ def main():
         
         if args.visualize:
             print(f"🖼️  可視化: {output_dir / 'visualizations'}")
+        
+        # 7. 類似度分析（オプション）
+        if args.similarity_analysis:
+            logger.info("類似度分析を実行中...")
+            
+            try:
+                # 類似度分析器の初期化
+                similarity_analyzer = ArchaeologicalSimilarityAnalyzer(str(csv_path))
+                
+                # 分析実行
+                logger.info("データ読み込み中...")
+                similarity_analyzer.load_data()
+                
+                logger.info("特徴量エンジニアリング中...")
+                similarity_analyzer.engineer_features()
+                
+                logger.info("データ前処理中...")
+                similarity_analyzer.preprocess_features()
+                
+                logger.info("高相関特徴量除去中...")
+                similarity_analyzer.remove_high_correlation_features()
+                
+                logger.info("類似度モデル構築中...")
+                similarity_analyzer.build_similarity_models()
+                
+                logger.info("類似度スコア計算中...")
+                scores_df = similarity_analyzer.calculate_similarity_scores()
+                
+                # 類似度分析結果の出力
+                similarity_output_dir = output_dir / "similarity_analysis"
+                similarity_output_dir.mkdir(exist_ok=True)
+                
+                scores_output_path = similarity_output_dir / f"similarity_scores_{args.region}.csv"
+                scores_df.to_csv(scores_output_path, index=False)
+                
+                # 分析レポート生成
+                report_path = similarity_output_dir / f"similarity_report_{args.region}.md"
+                report_content = similarity_analyzer.generate_analysis_report(scores_df)
+                
+                with open(report_path, 'w', encoding='utf-8') as f:
+                    f.write(report_content)
+                
+                logger.info(f"類似度分析完了: {similarity_output_dir}")
+                print(f"📊 類似度分析結果: {similarity_output_dir}")
+                
+            except Exception as sim_error:
+                logger.error(f"類似度分析エラー: {sim_error}")
+                print(f"⚠️  類似度分析でエラーが発生しましたが、基本分析は完了しています: {sim_error}")
         
     except Exception as e:
         print(f"\n❌ エラーが発生しました: {e}")

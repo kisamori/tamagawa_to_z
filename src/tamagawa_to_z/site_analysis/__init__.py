@@ -12,10 +12,14 @@ from .toponym_extractor import ToponymExtractor
 from .polar_converter import PolarConverter
 from .river_distance import RiverDistanceCalculator
 from .csv_exporter import CSVExporter
+from .similarity_analyzer import ArchaeologicalSimilarityAnalyzer
+from .site_clusterer import SiteClusterer
 
 __all__ = [
     'ToponymExtractor',
     'PolarConverter', 
     'RiverDistanceCalculator',
-    'CSVExporter'
+    'CSVExporter',
+    'ArchaeologicalSimilarityAnalyzer',
+    'SiteClusterer'
 ]
