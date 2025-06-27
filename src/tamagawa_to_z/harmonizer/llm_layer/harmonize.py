@@ -500,8 +500,8 @@ class ToponymHarmonizer:
         # 既存語根の取得
         if existing_roots is None:
             try:
-                from .root_io import load_water_roots
-                water_roots_df = load_water_roots()
+                from .root_io import load_roots
+                water_roots_df = load_roots(use_all_roots=False)  # water_roots.csvを読み込み
                 existing_roots = water_roots_df['root'].tolist() if not water_roots_df.empty else []
             except Exception as e:
                 logger.warning(f"既存語根の読み込みに失敗: {e}")

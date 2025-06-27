@@ -33,7 +33,8 @@ class HybridBO:
         data_splitter,
         toponym_stats: Dict[str, int],
         config_path: Optional[Path] = None,
-        n_trials: int = 50
+        n_trials: int = 50,
+        resume: bool = False
     ):
         """
         初期化.
@@ -43,10 +44,12 @@ class HybridBO:
             toponym_stats: 語根の出現統計
             config_path: 設定ファイルパス（optuna_space.yaml）
             n_trials: 試行回数
+            resume: 既存studyを再開するかどうか
         """
         self.data_splitter = data_splitter
         self.toponym_stats = toponym_stats
         self.n_trials = n_trials
+        self.resume = resume
         
         # 設定読み込み
         if config_path is None:
@@ -125,7 +128,13 @@ class HybridBO:
     def _setup_optuna_study(self):
         """Optuna studyをセットアップする."""
         storage_url = self.config["storage"]["url"]
-        study_name = self.config["storage"]["study_name"]
+        base_study_name = self.config["storage"]["study_name"]
+        
+        # resumeしない場合はタイムスタンプ付きの新しいstudy名を生成
+        if self.resume:
+            study_name = base_study_name
+        else:
+            study_name = f"{base_study_name}_{self.timestamp}"
         
         # データベースディレクトリ作成
         if storage_url.startswith("sqlite:///"):
@@ -159,10 +168,10 @@ class HybridBO:
             direction=self.config["optimization"]["direction"],
             sampler=sampler,
             pruner=pruner,
-            load_if_exists=True
+            load_if_exists=self.resume
         )
         
-        logger.info(f"Created Optuna study: {study_name}")
+        logger.info(f"Created Optuna study: {study_name} (resume={self.resume})")
     
     def _objective(self, trial: optuna.Trial) -> float:
         """
@@ -359,13 +368,81 @@ class HybridBO:
         logger.info(f"Saved optimization history to {history_file}")
 
 
-def create_sample_toponym_stats() -> Dict[str, int]:
+def create_toponym_stats_from_all_roots() -> Dict[str, int]:
     """
-    サンプルの地名統計を作成する（テスト用）.
+    all_roots.csvから語根統計を作成する（実データベース）.
     
     Returns:
-        地名統計辞書
+        語根統計辞書 {root: estimated_count}
     """
+    try:
+        # all_roots.csvから語根データを読み込み
+        from pathlib import Path
+        import pandas as pd
+        
+        project_root = Path(__file__).resolve().parents[3]
+        all_roots_path = project_root / "data" / "dict" / "all_roots.csv"
+        
+        if not all_roots_path.exists():
+            logger.warning(f"all_roots.csv not found at {all_roots_path}, using fallback sample data")
+            return _create_fallback_sample_stats()
+        
+        df = pd.read_csv(all_roots_path)
+        
+        if df.empty:
+            logger.warning("all_roots.csv is empty, using fallback sample data")
+            return _create_fallback_sample_stats()
+        
+        logger.info(f"Loading toponym stats from all_roots.csv: {len(df)} roots")
+        
+        # カテゴリ別の推定出現頻度を設定
+        category_weights = {
+            'water': 15,      # 水系語根は比較的高頻度
+            'terrain': 8,     # 地形語根は中頻度
+            'flora': 6,       # 植生語根は中頻度
+            'culture': 4,     # 文化語根は低頻度
+            'resource': 3,    # 資源語根は低頻度
+            'temporal': 5     # 時間語根は中頻度
+        }
+        
+        stats = {}
+        for _, row in df.iterrows():
+            root = row.get('root', '')
+            category = row.get('category', 'water')
+            weight = float(row.get('weight', 0.5))
+            
+            if root:
+                # カテゴリ別基準頻度 × 語根重み × ランダム要素（正規化）
+                base_freq = category_weights.get(category, 5)
+                # ハッシュ値を0-1の範囲に正規化
+                random_factor = 0.8 + 0.4 * abs(hash(root) % 1000) / 1000.0
+                estimated_count = max(1, int(base_freq * weight * random_factor))
+                stats[root] = estimated_count
+        
+        # カテゴリ別統計をログ出力
+        if 'category' in df.columns:
+            category_stats = df['category'].value_counts().to_dict()
+            logger.info(f"Category distribution: {category_stats}")
+        
+        total_count = sum(stats.values())
+        logger.info(f"Generated toponym stats: {len(stats)} roots, total estimated count: {total_count}")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Failed to load from all_roots.csv: {e}")
+        logger.warning("Falling back to sample data")
+        return _create_fallback_sample_stats()
+
+
+def _create_fallback_sample_stats() -> Dict[str, int]:
+    """
+    フォールバック用のサンプル統計（all_roots.csv読み込み失敗時のみ使用）.
+    
+    Returns:
+        サンプル地名統計辞書
+    """
+    logger.warning("Using fallback sample toponym statistics")
     sample_stats = {
         "igarape": 25,
         "parana": 18,

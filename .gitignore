@@ -89,6 +89,7 @@ Thumbs.db
 /logs/
 *.log
 /docs/archive/
+.llm_root_cache/
 
 # DVC
 .dvc/

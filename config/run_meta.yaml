@@ -1,9 +1,12 @@
 data_source: sample_data
-notes: テストデータを使用したInspector-Validator Agentの動作確認
+notes: setting of hyperparameters
 parameters:
-  distance_threshold_km: 3.0
+#  distance_threshold_km: 3.0 # default
+#  distance_threshold_km: 2.98 # optimize for Acre by BO
+  distance_threshold_km: 2.0 # optimize for Marajo by hand
   min_score: 0.3
-  water_occurrence_threshold: 5.0
+  water_occurrence_threshold: 5.0 # default
+#  water_occurrence_threshold: 0.5 # optimize by BO
 purpose: inspector_validator_test
 region: Acre, Brazil
 run_id: 4d7fac8c

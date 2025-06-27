@@ -205,10 +205,17 @@ def _format_user_prompt(
     if template is None:
         template = """Distance threshold = {distance_km} km, 
 Water occurrence = {occ_pct} %.
+Active root categories: {active_categories}
 Toponym stats: {toponym_stats}
 Recent false positives: {false_pos}
 
-Return JSON: {{"weights": {{"root": float, ...}}}} with values 0.1-1.0"""
+Return JSON: {{"weights": {{"root": float, ...}}}} with values 0.1-1.0
+Note: Consider category-specific weights for multi-dimensional root analysis."""
+
+    # active_categoriesがない場合はデフォルトを設定
+    if 'active_categories' not in context:
+        context = context.copy()  # 元のdictを変更しないようにコピー
+        context['active_categories'] = ['water']  # デフォルト値
 
     try:
         return template.format(**context)

@@ -2,14 +2,14 @@
 search_space:
   distance_km:
     type: "float"
-    low: 1.0
-    high: 10.0
+    low: 0.5      # 1.0 → 0.5 (より狭い範囲も探索)
+    high: 15.0    # 20.0 → 15.0 (実用的な上限)
     log: false
     
   occ_pct:
     type: "float"
-    low: 1.0
-    high: 10.0
+    low: 0.5      # 1.0 → 0.5 (より低い閾値も探索)
+    high: 20.0    # 10.0 → 20.0 (より高い閾値も探索)
     log: false
 
 # BO 設定
@@ -42,12 +42,12 @@ experiment:
   
 # 評価関数の重み
 objective:
-  recall_weight: 0.6      # Recall@100 の重み
+  recall_weight: 0.6      # Recall@{recall_k} の重み
   map_weight: 0.2         # Mean Average Precision の重み
-  workload_weight: -0.2   # 候補数ペナルティ（負の重み）
+  workload_weight: -0.1   # 候補数ペナルティ（負の重み）
   
   # 評価設定
-  recall_k: 100
+  recall_k: 10
   workload_scale: "log10"  # log10, linear, sqrt
   
 # LLM 設定
