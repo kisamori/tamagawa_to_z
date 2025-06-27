@@ -46,9 +46,11 @@
 | **座標** | **-9.839247, -68.498725** |
 
 **地図で確認:**
+
 <a href="https://www.google.com/maps?q=-9.839247,-68.498725">
-  <img src="docs/images/8.gif" alt="Ramal Olho D'água" width="400">
+  <img src="docs/images/8.gif" alt="Ramal Olho D'água" width="500">
 </a>
+
 - 🌍 [Google Maps で開く](https://www.google.com/maps?q=-9.839247,-68.498725)
 
 この場所は、既知の遺跡群からは離れた、まさに“空白地帯“に位置する。
