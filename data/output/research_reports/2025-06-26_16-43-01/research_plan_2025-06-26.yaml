@@ -1,0 +1,65 @@
+experiment_id: exp_2025_06_26_01
+base_commit: latest
+proposals:
+- id: A
+  title: 距離閾値の拡大＋頻度閾値の緩和
+  changes:
+  - action: set_param
+    params:
+      distance_threshold_m: 45
+  - action: set_param
+    params:
+      min_feature_frequency: 3
+  expected_effect:
+    recall@100: +8–12%
+    workload: +70±20
+  rationale: Acre の森林地では遺構が周囲植生の影響で分断されやすく、現行の 30 m 閾値では同一遺構が別候補に割れて recall が低下している。距離閾値を
+    45 m に広げると散在点を同一クラスタとして扱え、真陽性の取りこぼしを抑制できる。また min_feature_frequency を 5→3 に緩めることで、低頻度だが特徴的な地表形状を含められる。両者は候補数を大幅に増やさずに網羅性を高める組み合わせ。
+  risk: 距離閾値拡大により異なる遺構が誤って融合する可能性があり precision 低下の懸念。また低頻度フィルタ緩和によりノイズが混入しやすい。
+  human_effort: ★☆☆ (簡単)
+- id: C
+  title: Adjust Amazonian water root weights
+  changes:
+  - action: add_root_weight
+    params:
+      root_weight_table:
+        igarape: 1.5
+        lagoa: 1.3
+        rio: 1.2
+        parana: 1.4
+        igapo: 1.3
+  expected_effect:
+    root_diversity: '+0.3'
+    recall@100: +3%
+  rationale: Emphasize important Amazonian water-related toponyms to improve detection
+    of relevant sites
+  risk: May bias results toward Portuguese/Spanish toponyms
+  human_effort: ★☆☆ (30min)
+- id: B
+  title: 多言語Few-shot＋確信度付JSON出力プロンプト
+  changes:
+  - action: modify_prompt
+    target_agent: harmonizer.llm_layer.harmonize
+    description: '1) system メッセージに『あなたは水関連地名分類専用のアノテータであり、列挙された 9 種類の水域タグ以外は返さない』と明示。
+
+      2) 以下フォーマットでのみ回答せよと指示：{"name":"<原文>", "tag":"<water_tag|non_water|unknown>",
+      "confidence":<0-1>}。
+
+      3) few-shot 例を日本語・英語・中国語・アイヌ語など計12例追加し、語根が同じでも意味が異なる negative 例（例：Shimizu＝水系
+      / Shimozu＝非水系）を含める。
+
+      4) "判断できない場合はunknown" というエスケープを許可し幻覚を抑制。
+
+      '
+  expected_effect:
+    map: +5%
+    api_cost: +12% APIコスト
+  rationale: '・選択肢を限定しスキーマを固定することで LLM の幻覚出力を抑止。
+
+    ・多言語 positive/negative few-shot により語根の不一致と多言語表記ゆれを学習させ、再現率を向上。
+
+    ・confidence スコアにより閾値調整が可能になり、mAP 最適化が容易。
+
+    '
+  risk: プロンプト長増大によるトークン溢れ・レイテンシ増。confidence 値のキャリブレーションが必要。
+  human_effort: ★★☆
