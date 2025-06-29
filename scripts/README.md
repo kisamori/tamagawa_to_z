@@ -1,275 +1,275 @@
 # Scripts Documentation
 
-このディレクトリには、地名データから考古学的な遺跡候補地を発見・評価するための一連の分析を実行するスクリプトが格納されています。
+This directory contains scripts for executing a series of analyses to discover and evaluate archaeological site candidates from place name data.
 
-## ワークフロー概要
+## Workflow Overview
 
-このプロジェクトは、大きく分けて以下の4つのステップで構成されています。各スクリプトは、それぞれのステップで特定の役割を担う専門家のように機能します。
+This project consists of four main steps. Each script functions like a specialist responsible for a specific role in each step.
 
-1.  **準備・辞書づくり (Preparation & Dictionary Building)**
-    - 分析の基礎となるデータや、地名を解釈するための辞書を作成します。
-2.  **候補地を探す (Candidate Exploration)**
-    - 地理空間データと地名を照合し、遺跡の可能性がある場所を探索します。
-3.  **候補地を評価・分析する (Candidate Evaluation & Analysis)**
-    - AIや機械学習を用いて、見つかった候補地をスコアリングし、有望な順にランク付けします。
-4.  **全体を効率化・自動化する (Workflow Automation & Optimization)**
-    - 一連の分析フローを統括したり、最適な分析条件を自動で探索したりします。
+1.  **Preparation & Dictionary Building**
+    - Creates foundational data and dictionaries for interpreting place names during analysis.
+2.  **Candidate Exploration**
+    - Cross-references geospatial data with place names to explore potential archaeological sites.
+3.  **Candidate Evaluation & Analysis**
+    - Uses AI and machine learning to score discovered candidates and rank them by promise.
+4.  **Workflow Automation & Optimization**
+    - Orchestrates the entire analysis flow and automatically explores optimal analysis conditions.
 
 ---
 
-## 1. 準備・辞書づくり (Preparation & Dictionary Building)
+## 1. Preparation & Dictionary Building
 
 ### `run_root_extraction.py`
 
-#### 役割
-**【言葉の辞書を作る人】**
-地名の中から「川」「水辺」など、特定のカテゴリ（水、地形など）に関連する言葉（語根）を見つけ出し、分析の基礎となる単語リストを作成・更新します。
+#### Role
+**【Word Dictionary Creator】**
+Identifies words (roots) related to specific categories (water, terrain, etc.) such as "river" and "waterside" from place names, and creates/updates word lists that form the foundation of analysis.
 
-#### 主な機能
-- OSM (OpenStreetMap) データから地名を収集します。
-- AI (LLM) を使って収集した地名を分析し、新しい語根の候補を発見します。
-- 既存の語根辞書 (`data/dict/*.csv`) に新しい語根を自動または手動で追加・更新します。
-- カテゴリ別の語根辞書を `all_roots.csv` に統合する機能も持ちます。
+#### Main Functions
+- Collects place names from OSM (OpenStreetMap) data.
+- Uses AI (LLM) to analyze collected place names and discover new root candidates.
+- Automatically or manually adds/updates new roots to existing root dictionaries (`data/dict/*.csv`).
+- Also has functionality to integrate category-specific root dictionaries into `all_roots.csv`.
 
-#### 使用方法
-- **基本実行（Acre地域の水関連語根を抽出）**
+#### Usage
+- **Basic execution (extract water-related roots from Acre region)**
   ```bash
   python scripts/run_root_extraction.py --region acre --visualize
   ```
-- **カテゴリ別CSVを統合して `all_roots.csv` を作成**
+- **Integrate category-specific CSVs to create `all_roots.csv`**
   ```bash
   python scripts/run_root_extraction.py --create-all-roots
   ```
-- **主な引数**
-  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
-  - `--bbox`: 対象のBBox (座標範囲) を手動で指定します。
-  - `--pbf-path`: 使用するOSMのPBFファイルパスを指定します。
-  - `--output-dir`: 結果を出力するディレクトリを指定します。
-  - `--sample-size`: LLM分析にかける地名のサンプル数を指定し、コストを削減します。
-  - `--visualize`: 処理過程で生成される地図などの可視化画像を保存します。
-  - `--create-all-roots`: 他の処理は行わず、カテゴリ別CSVを `all_roots.csv` にマージします。
+- **Main arguments**
+  - `--region`: Specify target region (`acre`, `marajo`, etc.).
+  - `--bbox`: Manually specify target BBox (coordinate range).
+  - `--pbf-path`: Specify the OSM PBF file path to use.
+  - `--output-dir`: Specify directory to output results.
+  - `--sample-size`: Specify number of place name samples for LLM analysis to reduce costs.
+  - `--visualize`: Save visualization images such as maps generated during processing.
+  - `--create-all-roots`: Skip other processing and merge category-specific CSVs into `all_roots.csv`.
 
 ### `run_split.py`
 
-#### 役割
-**【データ整理の専門家】**
-既知の遺跡データを、機械学習モデルが公平かつ正確に学習・評価できるよう、「訓練用」「検証用」「テスト用」といったグループに分割します。
+#### Role
+**【Data Organization Specialist】**
+Divides known archaeological site data into groups such as "training," "validation," and "test" so that machine learning models can learn and evaluate fairly and accurately.
 
-#### 主な機能
-- 遺跡データを、発見年や地理的な位置に基づいて分割します。
-  - **Train:** モデルの学習用データ
-  - **Validation:** 学習中のモデルの性能評価用データ
-  - **Test-time:** 時間的に新しいデータ（未来のデータに対する性能評価用）
-  - **Test-region:** 地理的に異なる地域のデータ（未知の地域に対する汎化性能評価用）
-- 分割したデータを、それぞれ個別のGISファイル (`.gpkg`) として出力します。
+#### Main Functions
+- Divides archaeological site data based on discovery year and geographical location.
+  - **Train:** Data for model training
+  - **Validation:** Data for evaluating model performance during training
+  - **Test-time:** Temporally newer data (for evaluating performance on future data)
+  - **Test-region:** Data from geographically different regions (for evaluating generalization performance on unknown regions)
+- Outputs divided data as separate GIS files (`.gpkg`).
 
-#### 使用方法
-- **基本実行**
+#### Usage
+- **Basic execution**
   ```bash
   python scripts/run_split.py --config configs/dataset_split.yaml --sites data/known/known_acre.kmz --output data/known/split
   ```
-- **主な引数**
-  - `--config`: 分割のルールを定義した設定ファイル (`.yaml`) のパス。
-  - `--sites`: 分割対象となる遺跡データ (`.kmz`, `.csv`, `.gpkg`) のパス。
-  - `--output`: 分割後のファイルを出力するディレクトリのパス。
-  - `--dry-run`: 実際にはファイルを出力せず、分割結果の統計情報のみを表示します。
+- **Main arguments**
+  - `--config`: Path to configuration file (`.yaml`) defining division rules.
+  - `--sites`: Path to archaeological site data to be divided (`.kmz`, `.csv`, `.gpkg`).
+  - `--output`: Path to directory for outputting divided files.
+  - `--dry-run`: Display only statistical information of division results without actually outputting files.
 
 ---
 
-## 2. 候補地を探す (Candidate Exploration)
+## 2. Candidate Exploration
 
 ### `run_site_identification.py`
 
-#### 役割
-**【候補地探しのメイン担当】**
-「**今は川がないのに、名前に『川』と付く場所**」を探し出します。このような場所は、昔の川の跡（古河道）である可能性が高く、遺跡候補地となります。
+#### Role
+**【Main Candidate Search Specialist】**
+Searches for "**places that don't have rivers now but have 'river' in their names**." Such places have a high possibility of being traces of ancient rivers (paleochannels) and become archaeological site candidates.
 
-#### 主な機能
-- 地名データ、現在の河川データ (HydroRIVERS)、過去の水域存在確率データ (GSW) を統合的に分析します。
-- 川からの距離や水域の頻度に基づいて候補地をスコアリングし、リストアップします。
-- Optunaによる最適化の対象となる、コアな分析パイプラインです。
+#### Main Functions
+- Comprehensively analyzes place name data, current river data (HydroRIVERS), and historical water occurrence probability data (GSW).
+- Scores and lists candidate sites based on distance from rivers and water occurrence frequency.
+- Core analysis pipeline that is the target of Optuna optimization.
 
-#### 使用方法
-- **基本実行（Acre地域）**
+#### Usage
+- **Basic execution (Acre region)**
   ```bash
   python scripts/run_site_identification.py --region acre --visualize
   ```
-- **パラメータを指定して実行**
+- **Execution with specified parameters**
   ```bash
   python scripts/run_site_identification.py --region acre --dist-threshold 2.5 --occ-threshold 15.0
   ```
-- **主な引数**
-  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
-  - `--rivers-path`, `--gsw-path`, `--pbf-path`: データパスを個別に指定します。
-  - `--output-path`: 最終的な候補地リスト (`.csv`) の出力先を指定します。
-  - `--dist-threshold`: 「川からこれ以上離れている」という距離のしきい値 (km)。
-  - `--occ-threshold`: 「水があった確率がこれ以下」という水域頻度のしきい値 (%)。
-  - `--visualize`: 候補地の分布図などを画像として保存します。
+- **Main arguments**
+  - `--region`: Specify target region (`acre`, `marajo`, etc.).
+  - `--rivers-path`, `--gsw-path`, `--pbf-path`: Individually specify data paths.
+  - `--output-path`: Specify output destination for final candidate site list (`.csv`).
+  - `--dist-threshold`: Distance threshold (km) for "farther than this from rivers."
+  - `--occ-threshold`: Water occurrence frequency threshold (%) for "water probability below this."
+  - `--visualize`: Save candidate site distribution maps and other visualizations as images.
 
 ### `run_analyze_site.py`
 
-#### 役割
-**【既知遺跡の分析官】**
-すでに見つかっている遺跡の周辺では、地名がどのようなパターン（距離や方角）で分布しているかを詳しく分析します。これは、候補地のパターンが「遺跡らしいか」を判断するための基準となります。
+#### Role
+**【Known Site Analyst】**
+Analyzes in detail how place names are distributed in patterns (distance and direction) around already discovered archaeological sites. This serves as a standard for judging whether candidate site patterns are "site-like."
 
-#### 主な機能
-- 既知の遺跡周辺の地名をOSMから抽出します。
-- 抽出した地名を、遺跡を中心とした極座標（距離と角度）に変換します。
-- 地名と最寄りの川との距離を計算します。
-- 分析結果をCSVファイルに出力し、オプションで可視化も行います。
+#### Main Functions
+- Extracts place names around known archaeological sites from OSM.
+- Converts extracted place names to polar coordinates (distance and angle) centered on sites.
+- Calculates distances between place names and nearest rivers.
+- Outputs analysis results to CSV files and optionally performs visualization.
 
-#### 使用方法
-- **基本実行**
+#### Usage
+- **Basic execution**
   ```bash
   python scripts/run_analyze_site.py --region acre --radius 5.0 --visualize
   ```
-- **主な引数**
-  - `--region`: 分析対象の地域 (`acre`, `marajo`など) を指定します。
-  - `--radius`: 各遺跡から地名を検索する半径 (km) を指定します。
-  - `--visualize`: 分析結果（地名分布図、極座標プロットなど）を画像として保存します。
-  - `--similarity-analysis`: 抽出したデータを使って、続けて類似度分析を実行します。
+- **Main arguments**
+  - `--region`: Specify analysis target region (`acre`, `marajo`, etc.).
+  - `--radius`: Specify radius (km) for searching place names from each site.
+  - `--visualize`: Save analysis results (place name distribution maps, polar coordinate plots, etc.) as images.
+  - `--similarity-analysis`: Continue with similarity analysis using extracted data.
 
 ---
 
-## 3. 候補地を評価・分析する (Candidate Evaluation & Analysis)
+## 3. Candidate Evaluation & Analysis
 
 ### `run_similarity_analysis.py`
 
-#### 役割
-**【AI鑑定士（スコア付け）】**
-機械学習を使い、見つけた候補地が「既知の遺跡の地名パターンとどれくらい似ているか」を**点数（スコア）付け**し、有望な順にランキングを作成します。さらにAIが「なぜ似ているのか」という理由も解説してくれます。
+#### Role
+**【AI Appraiser (Scoring)】**
+Uses machine learning to **score** how similar discovered candidates are to "place name patterns of known archaeological sites" and creates rankings in order of promise. Additionally, AI explains the reasons "why they are similar."
 
-#### 主な機能
-- 既知遺跡の地名分布から特徴量（距離、密度、方角など）を生成します。
-- 機械学習モデル (kNN, クラスタリング等) を構築し、候補地と既知遺跡との類似度をスコアリングします。
-- 候補地を類似度の高い順にランキングし、結果をCSVやKMZ形式で出力します。
-- OpenAIのLLMを使い、各候補地の類似性の根拠を文章で自動生成します。
+#### Main Functions
+- Generates features (distance, density, direction, etc.) from place name distributions of known sites.
+- Builds machine learning models (kNN, clustering, etc.) and scores similarity between candidates and known sites.
+- Ranks candidates by similarity and outputs results in CSV and KMZ formats.
+- Uses OpenAI's LLM to automatically generate textual explanations of similarity rationale for each candidate.
 
-#### 使用方法
-- **基本実行（候補地のランキングを作成）**
+#### Usage
+- **Basic execution (create candidate rankings)**
   ```bash
   python scripts/run_similarity_analysis.py --region acre --mode candidate_ranking
   ```
-- **主な引数**
-  - `--region`: 分析対象の地域 (`acre`, `marajo`など) を指定します。
-  - `--mode`: `candidate_ranking` (候補地を評価) または `similarity_only` (既知遺跡間の類似度のみ評価) を選択します。
-  - `--output-dir`: レポートやランキング結果を出力するディレクトリを指定します。
-  - `--config`: 地域ごとのデータパスを定義した設定ファイル (`.yaml`) を指定します。
+- **Main arguments**
+  - `--region`: Specify analysis target region (`acre`, `marajo`, etc.).
+  - `--mode`: Choose `candidate_ranking` (evaluate candidates) or `similarity_only` (evaluate only similarity between known sites).
+  - `--output-dir`: Specify directory to output reports and ranking results.
+  - `--config`: Specify configuration file (`.yaml`) defining data paths for each region.
 
 ### `run_inspector.py`
 
-#### 役割
-**【AI監査官】**
-分析結果全体をチェックし、「この分析はうまくいっているか？」「もっと精度を上げるには、どのパラメータを調整すればいいか？」といった**改善案を提案**します。
+#### Role
+**【AI Auditor】**
+Checks overall analysis results and **proposes improvements** such as "Is this analysis working well?" and "Which parameters should be adjusted to improve accuracy?"
 
-#### 主な機能
-- 候補地データと既知の遺跡データを比較し、Recall（再現率）やmAP（平均適合率）などの評価指標を計算します。
-- 分析結果に基づいて、パラメータ調整などの改善提案を生成します。
-- 分析レポート (Markdown形式) と改善計画 (YAML形式) を出力します。
+#### Main Functions
+- Compares candidate data with known archaeological site data and calculates evaluation metrics such as Recall and mAP (mean Average Precision).
+- Generates improvement proposals such as parameter adjustments based on analysis results.
+- Outputs analysis reports (Markdown format) and improvement plans (YAML format).
 
-#### 使用方法
-- **基本実行**
+#### Usage
+- **Basic execution**
   ```bash
   python scripts/run_inspector.py --candidates data/output/candidates/paleochannel_candidates.csv --known data/known/known_acre.kmz
   ```
-- **主な引数**
-  - `--candidates`: 評価対象の候補地データ (`.csv`) のパス。
-  - `--known`: 比較基準となる既知の遺跡データ (`.kmz`, `.gpkg`など) のパス。
-  - `--output`: レポートや計画ファイルを出力するディレクトリを指定します。
+- **Main arguments**
+  - `--candidates`: Path to candidate data for evaluation (`.csv`).
+  - `--known`: Path to known archaeological site data as comparison standard (`.kmz`, `.gpkg`, etc.).
+  - `--output`: Specify directory to output reports and plan files.
 
 ### `run_researcher.py`
 
-#### 役割
-**【AI博士】**
-監査官のレポートをさらに深掘りし、「どの改善案が一番効果的か？」「次に何を試すべきか？」という、より具体的な**研究計画を立ててくれる**コンサルタントです。
+#### Role
+**【AI Researcher】**
+A consultant that further explores the auditor's reports and **creates research plans** with more specific questions like "Which improvement proposal is most effective?" and "What should we try next?"
 
-#### 主な機能
-- `run_inspector.py` の出力（分析レポートと改善計画）を入力として受け取ります。
-- AI (LLM) を用いて、より掘り下げた考察や、複数の改善案の優先順位付けを行います。
-- 研究レポートと、より詳細な改善計画を出力します。
+#### Main Functions
+- Receives output from `run_inspector.py` (analysis reports and improvement plans) as input.
+- Uses AI (LLM) to conduct deeper analysis and prioritize multiple improvement proposals.
+- Outputs research reports and more detailed improvement plans.
 
-#### 使用方法
-- **基本実行（最新のInspectorレポートを自動で読み込む）**
+#### Usage
+- **Basic execution (automatically loads latest Inspector report)**
   ```bash
   python scripts/run_researcher.py
   ```
-- **主な引数**
-  - `--artefacts`: Inspectorの出力が含まれるディレクトリのパス。指定しない場合、最新のものが自動で選択されます。
-  - `--output`: 研究レポートなどを出力するディレクトリを指定します。
+- **Main arguments**
+  - `--artefacts`: Path to directory containing Inspector output. If not specified, the latest one is automatically selected.
+  - `--output`: Specify directory to output research reports and other files.
 
 ---
 
-## 4. 全体を効率化・自動化する (Workflow Automation & Optimization)
+## 4. Workflow Automation & Optimization
 
 ### `run_optuna.py`
 
-#### 役割
-**【最適化の専門家】**
-「川から何km離れた場所を探すか？」といった分析の条件（パラメータ）を、コンピューターが自動で何百回も試行錯誤し、**最も良い結果が出る「黄金のパラメータ」**を見つけ出してくれます。
+#### Role
+**【Optimization Specialist】**
+Automatically tries hundreds of analysis conditions (parameters) such as "How many km away from rivers should we search?" and finds the **"golden parameters"** that produce the best results.
 
-#### 主な機能
-- `run_site_identification.py` の分析パイプラインを、パラメータを変えながら繰り返し実行します。
-- 最適化ライブラリOptunaを使い、最も良いスコアが得られるパラメータの組み合わせを探索します。
-- 見つかった最適なパラメータはJSONファイルとして保存され、`run_best_params.py` で利用されます。
+#### Main Functions
+- Repeatedly executes the analysis pipeline of `run_site_identification.py` while changing parameters.
+- Uses the optimization library Optuna to search for parameter combinations that yield the best scores.
+- Found optimal parameters are saved as JSON files and used by `run_best_params.py`.
 
-#### 使用方法
-- **基本実行**
+#### Usage
+- **Basic execution**
   ```bash
   python scripts/run_optuna.py --region acre --trials 50 --sites data/known/split/val.gpkg
   ```
-- **主な引数**
-  - `--region`: 最適化の対象となる地域 (`acre`, `marajo`など) を指定します。
-  - `--trials`: 最適化の試行回数を指定します。
-  - `--sites`: 評価基準となる検証用サイトデータ (`.gpkg`など) のパス。
-  - `--timeout`: 1試行あたりの最大実行時間 (秒) を指定します。
-  - `--resume`: 中断した最適化を再開します。
+- **Main arguments**
+  - `--region`: Specify region for optimization target (`acre`, `marajo`, etc.).
+  - `--trials`: Specify number of optimization trials.
+  - `--sites`: Path to validation site data (`.gpkg`, etc.) serving as evaluation standard.
+  - `--timeout`: Specify maximum execution time (seconds) per trial.
+  - `--resume`: Resume interrupted optimization.
 
 ### `run_best_params.py`
 
-#### 役割
-**【最終実行者】**
-最適化の専門家 (`run_optuna.py`) が見つけた「黄金のパラメータ」を使って、**最高の条件で最終的な分析を実行**し、結果を評価・可視化します。
+#### Role
+**【Final Executor】**
+Uses the "golden parameters" found by the optimization specialist (`run_optuna.py`) to **execute final analysis under optimal conditions** and evaluate/visualize results.
 
-#### 主な機能
-- Optunaが出力した最適なパラメータ (JSONファイル) を読み込みます。
-- そのパラメータを使って、遺跡候補地の特定とスコアリングを行います。
-- 評価データセット（Validation/Test）に対してスコアを算出し、性能を評価します。
-- オプションで、分析の各ステップや最終的な候補地の分布を詳細に可視化します。
+#### Main Functions
+- Loads optimal parameters (JSON file) output by Optuna.
+- Uses those parameters to identify and score archaeological site candidates.
+- Calculates scores against evaluation datasets (Validation/Test) and evaluates performance.
+- Optionally provides detailed visualization of each analysis step and final candidate distribution.
 
-#### 使用方法
-- **基本実行**
+#### Usage
+- **Basic execution**
   ```bash
   python scripts/run_best_params.py --region acre --params data/output/optuna/best_params.json --sites data/known/known_acre.kmz --visualize
   ```
-- **主な引数**
-  - `--region`: 対象地域 (`acre`, `marajo`など) を指定します。
-  - `--params`: Optunaが出力した最良パラメータのJSONファイルパス。
-  - `--sites`: 評価に使用する遺跡データのパス。
-  - `--output`: 評価結果などを出力するディレクトリを指定します。
-  - `--visualize`: 最終結果や分析過程を詳細に可視化します。
+- **Main arguments**
+  - `--region`: Specify target region (`acre`, `marajo`, etc.).
+  - `--params`: JSON file path of best parameters output by Optuna.
+  - `--sites`: Path to archaeological site data used for evaluation.
+  - `--output`: Specify directory to output evaluation results and other files.
+  - `--visualize`: Detailed visualization of final results and analysis process.
 
 ### `run_harmonizer.py`
 
-#### 役割
-**【現場監督】**
-これまで説明した複数のスクリプト（辞書作りや候補地探しなど）を、**適切な順番で実行してくれる**まとめ役です。プロジェクト全体のワークフローを統括します。
+#### Role
+**【Project Manager】**
+A coordinator that **executes multiple scripts (dictionary creation, candidate search, etc.) in the proper order**. Orchestrates the entire project workflow.
 
-#### 主な機能
-- `run_root_extraction.py` と `run_site_identification.py` を内部で呼び出します。
-- `--mode` オプションによって、両方のタスクを実行するか、どちらか一方だけを実行するかを選択できます。
+#### Main Functions
+- Internally calls `run_root_extraction.py` and `run_site_identification.py`.
+- The `--mode` option allows selection of executing both tasks or just one of them.
 
-#### 使用方法
-- **両方のタスクを実行**
+#### Usage
+- **Execute both tasks**
   ```bash
   python scripts/run_harmonizer.py --mode both
   ```
-- **辞書管理のみ実行**
+- **Execute dictionary management only**
   ```bash
   python scripts/run_harmonizer.py --mode root-extraction
   ```
-- **サイト特定のみ実行**
+- **Execute site identification only**
   ```bash
   python scripts/run_harmonizer.py --mode site-identification
   ```
-- **主な引数**
-  - `--mode`: `both`, `root-extraction`, `site-identification` から実行モードを選択します。
+- **Main arguments**
+  - `--mode`: Select execution mode from `both`, `root-extraction`, `site-identification`.
