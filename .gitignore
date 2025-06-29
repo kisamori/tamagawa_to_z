@@ -83,12 +83,13 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-/data/raw/
-/data/interim/
+/data/
 /models/
 /output/
 /logs/
 *.log
+/docs/archive/
+.llm_root_cache/
 
 # DVC
 .dvc/

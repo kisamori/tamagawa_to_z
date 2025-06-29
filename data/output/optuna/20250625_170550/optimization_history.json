@@ -1,0 +1,782 @@
+[
+  {
+    "trial_number": 0,
+    "distance_km": 11.641532564943182,
+    "occ_pct": 0.9762244117018808,
+    "root_weights": {
+      "travessa": 0.15,
+      "rio": 0.95,
+      "porto": 0.88,
+      "boca": 0.85,
+      "y": 0.92
+    },
+    "score": -0.05,
+    "n_candidates": 0,
+    "execution_time": 9.722332954406738,
+    "metrics": {
+      "n_candidates_after_filter": 0,
+      "distance_threshold_km": 11.641532564943182,
+      "occurrence_threshold_pct": 0.9762244117018808,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.0,
+      "map_score": 0.0,
+      "workload": 0,
+      "composite_score": -0.05
+    }
+  },
+  {
+    "trial_number": 1,
+    "distance_km": 2.255271893559578,
+    "occ_pct": 2.701606862953756,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.85
+    },
+    "score": 0.6417354962027739,
+    "n_candidates": 55,
+    "execution_time": 7.413286924362183,
+    "metrics": {
+      "n_candidates_after_filter": 55,
+      "distance_threshold_km": 2.255271893559578,
+      "occurrence_threshold_pct": 2.701606862953756,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 55,
+      "composite_score": 0.6417354962027739
+    }
+  },
+  {
+    "trial_number": 2,
+    "distance_km": 2.2587788599117413,
+    "occ_pct": 1.3713617611734605,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.7,
+      "boca": 0.65,
+      "y": 0.85
+    },
+    "score": 0.6417354962027739,
+    "n_candidates": 55,
+    "execution_time": 10.13854193687439,
+    "metrics": {
+      "n_candidates_after_filter": 55,
+      "distance_threshold_km": 2.2587788599117413,
+      "occurrence_threshold_pct": 1.3713617611734605,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 55,
+      "composite_score": 0.6417354962027739
+    }
+  },
+  {
+    "trial_number": 3,
+    "distance_km": 13.50208325664135,
+    "occ_pct": 3.362531815615953,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.95,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.9
+    },
+    "score": -0.05,
+    "n_candidates": 0,
+    "execution_time": 5.322283029556274,
+    "metrics": {
+      "n_candidates_after_filter": 0,
+      "distance_threshold_km": 13.50208325664135,
+      "occurrence_threshold_pct": 3.362531815615953,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.0,
+      "map_score": 0.0,
+      "workload": 0,
+      "composite_score": -0.05
+    }
+  },
+  {
+    "trial_number": 4,
+    "distance_km": 7.189159669895477,
+    "occ_pct": 1.9178063206458404,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.85,
+      "y": 0.9
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 7.755326986312866,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 7.189159669895477,
+      "occurrence_threshold_pct": 1.9178063206458404,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 5,
+    "distance_km": 1.9097307788248572,
+    "occ_pct": 8.641005622887855,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 1.0
+    },
+    "score": 0.6391396459463318,
+    "n_candidates": 66,
+    "execution_time": 13.873368740081787,
+    "metrics": {
+      "n_candidates_after_filter": 66,
+      "distance_threshold_km": 1.9097307788248572,
+      "occurrence_threshold_pct": 8.641005622887855,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 66,
+      "composite_score": 0.6391396459463318
+    }
+  },
+  {
+    "trial_number": 6,
+    "distance_km": 11.92219453131641,
+    "occ_pct": 10.38449041772079,
+    "root_weights": {
+      "y": 0.9,
+      "rio": 0.85,
+      "porto": 0.75,
+      "boca": 0.7,
+      "travessa": 0.3
+    },
+    "score": -0.05,
+    "n_candidates": 0,
+    "execution_time": 5.844256162643433,
+    "metrics": {
+      "n_candidates_after_filter": 0,
+      "distance_threshold_km": 11.92219453131641,
+      "occurrence_threshold_pct": 10.38449041772079,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.0,
+      "map_score": 0.0,
+      "workload": 0,
+      "composite_score": -0.05
+    }
+  },
+  {
+    "trial_number": 7,
+    "distance_km": 0.9550046387734339,
+    "occ_pct": 2.026762616867683,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.95,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.75
+    },
+    "score": 0.6257478535743957,
+    "n_candidates": 168,
+    "execution_time": 7.656135320663452,
+    "metrics": {
+      "n_candidates_after_filter": 168,
+      "distance_threshold_km": 0.9550046387734339,
+      "occurrence_threshold_pct": 2.026762616867683,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 168,
+      "composite_score": 0.6257478535743957
+    }
+  },
+  {
+    "trial_number": 8,
+    "distance_km": 12.812919945639399,
+    "occ_pct": 9.120509098516223,
+    "root_weights": {
+      "travessa": 0.15,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.7,
+      "y": 0.85
+    },
+    "score": -0.05,
+    "n_candidates": 0,
+    "execution_time": 7.599172115325928,
+    "metrics": {
+      "n_candidates_after_filter": 0,
+      "distance_threshold_km": 12.812919945639399,
+      "occurrence_threshold_pct": 9.120509098516223,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.0,
+      "map_score": 0.0,
+      "workload": 0,
+      "composite_score": -0.05
+    }
+  },
+  {
+    "trial_number": 9,
+    "distance_km": 2.2090165723104476,
+    "occ_pct": 15.7476499451015,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.95
+    },
+    "score": 0.6412275708105407,
+    "n_candidates": 57,
+    "execution_time": 12.348948955535889,
+    "metrics": {
+      "n_candidates_after_filter": 57,
+      "distance_threshold_km": 2.2090165723104476,
+      "occurrence_threshold_pct": 15.7476499451015,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 57,
+      "composite_score": 0.6412275708105407
+    }
+  },
+  {
+    "trial_number": 10,
+    "distance_km": 8.224654106254071,
+    "occ_pct": 19.775415277476522,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.88
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 20.544528007507324,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 8.224654106254071,
+      "occurrence_threshold_pct": 19.775415277476522,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 11,
+    "distance_km": 6.441312144887606,
+    "occ_pct": 7.9814838247513205,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.75
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 11.792423009872437,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 6.441312144887606,
+      "occurrence_threshold_pct": 7.9814838247513205,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 12,
+    "distance_km": 4.270165892213457,
+    "occ_pct": 2.689627561782688,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.7,
+      "y": 0.85
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 13.722644805908203,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 4.270165892213457,
+      "occurrence_threshold_pct": 2.689627561782688,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 13,
+    "distance_km": 0.5175613354311301,
+    "occ_pct": 7.381810770517452,
+    "root_weights": {
+      "travessa": 0.15,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.85
+    },
+    "score": 0.6211618077982183,
+    "n_candidates": 231,
+    "execution_time": 5.632861852645874,
+    "metrics": {
+      "n_candidates_after_filter": 231,
+      "distance_threshold_km": 0.5175613354311301,
+      "occurrence_threshold_pct": 7.381810770517452,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 231,
+      "composite_score": 0.6211618077982183
+    }
+  },
+  {
+    "trial_number": 14,
+    "distance_km": 13.472703574506838,
+    "occ_pct": 18.31074260175198,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.8,
+      "porto": 0.85,
+      "boca": 0.75,
+      "y": 0.9
+    },
+    "score": -0.05,
+    "n_candidates": 0,
+    "execution_time": 9.16455078125,
+    "metrics": {
+      "n_candidates_after_filter": 0,
+      "distance_threshold_km": 13.472703574506838,
+      "occurrence_threshold_pct": 18.31074260175198,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.0,
+      "map_score": 0.0,
+      "workload": 0,
+      "composite_score": -0.05
+    }
+  },
+  {
+    "trial_number": 15,
+    "distance_km": 4.2981406680034935,
+    "occ_pct": 0.6560566444361204,
+    "root_weights": {
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.75,
+      "travessa": 0.25
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 4.376221179962158,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 4.2981406680034935,
+      "occurrence_threshold_pct": 0.6560566444361204,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 16,
+    "distance_km": 1.041231979252466,
+    "occ_pct": 1.3322262122776347,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.85,
+      "porto": 0.9,
+      "boca": 0.8,
+      "y": 0.95
+    },
+    "score": 0.6272824020923748,
+    "n_candidates": 151,
+    "execution_time": 12.591943979263306,
+    "metrics": {
+      "n_candidates_after_filter": 151,
+      "distance_threshold_km": 1.041231979252466,
+      "occurrence_threshold_pct": 1.3322262122776347,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 151,
+      "composite_score": 0.6272824020923748
+    }
+  },
+  {
+    "trial_number": 17,
+    "distance_km": 4.698076678473903,
+    "occ_pct": 5.8939211328216,
+    "root_weights": {
+      "travessa": 0.3,
+      "rio": 0.9,
+      "porto": 0.7,
+      "boca": 0.8,
+      "y": 0.85
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 9.493175029754639,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 4.698076678473903,
+      "occurrence_threshold_pct": 5.8939211328216,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 18,
+    "distance_km": 4.692589890597148,
+    "occ_pct": 10.431215060170596,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.85
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 8.431775093078613,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 4.692589890597148,
+      "occurrence_threshold_pct": 10.431215060170596,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 19,
+    "distance_km": 3.5549893618842043,
+    "occ_pct": 4.4509469192135285,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.85,
+      "y": 0.95
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 6.895322799682617,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 3.5549893618842043,
+      "occurrence_threshold_pct": 4.4509469192135285,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 20,
+    "distance_km": 6.107574380065274,
+    "occ_pct": 14.56276281518374,
+    "root_weights": {
+      "travessa": 0.3,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.7
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 5.494194746017456,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 6.107574380065274,
+      "occurrence_threshold_pct": 14.56276281518374,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 21,
+    "distance_km": 1.1881159878072436,
+    "occ_pct": 16.56557119383683,
+    "root_weights": {
+      "travessa": 0.4,
+      "rio": 0.85,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.9
+    },
+    "score": 0.6295454158392051,
+    "n_candidates": 129,
+    "execution_time": 7.475872993469238,
+    "metrics": {
+      "n_candidates_after_filter": 129,
+      "distance_threshold_km": 1.1881159878072436,
+      "occurrence_threshold_pct": 16.56557119383683,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 129,
+      "composite_score": 0.6295454158392051
+    }
+  },
+  {
+    "trial_number": 22,
+    "distance_km": 3.1970361780966945,
+    "occ_pct": 17.741427936467165,
+    "root_weights": {
+      "travessa": 0.3,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.9
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 6.365396976470947,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 3.1970361780966945,
+      "occurrence_threshold_pct": 17.741427936467165,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 23,
+    "distance_km": 1.4801467039733005,
+    "occ_pct": 14.092906006131404,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.85,
+      "porto": 0.9,
+      "boca": 0.75,
+      "y": 0.9
+    },
+    "score": 0.6347080675084554,
+    "n_candidates": 90,
+    "execution_time": 18.952369928359985,
+    "metrics": {
+      "n_candidates_after_filter": 90,
+      "distance_threshold_km": 1.4801467039733005,
+      "occurrence_threshold_pct": 14.092906006131404,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 90,
+      "composite_score": 0.6347080675084554
+    }
+  },
+  {
+    "trial_number": 24,
+    "distance_km": 3.5505429509325266,
+    "occ_pct": 19.88192179106144,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.85,
+      "boca": 0.8,
+      "y": 0.88
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 11.613434076309204,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 3.5505429509325266,
+      "occurrence_threshold_pct": 19.88192179106144,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 25,
+    "distance_km": 2.4231129217932335,
+    "occ_pct": 4.215049460538199,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.95
+    },
+    "score": 0.6439667330139108,
+    "n_candidates": 47,
+    "execution_time": 6.540738105773926,
+    "metrics": {
+      "n_candidates_after_filter": 47,
+      "distance_threshold_km": 2.4231129217932335,
+      "occurrence_threshold_pct": 4.215049460538199,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 47,
+      "composite_score": 0.6439667330139108
+    }
+  },
+  {
+    "trial_number": 26,
+    "distance_km": 2.9971624994864814,
+    "occ_pct": 1.5157894971037265,
+    "root_weights": {
+      "travessa": 0.25,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.7,
+      "y": 0.92
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 10.385058164596558,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 2.9971624994864814,
+      "occurrence_threshold_pct": 1.5157894971037265,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 27,
+    "distance_km": 1.725154410976265,
+    "occ_pct": 5.450086536037981,
+    "root_weights": {
+      "travessa": 0.4,
+      "rio": 0.9,
+      "porto": 0.8,
+      "boca": 0.75,
+      "y": 0.95
+    },
+    "score": 0.6375070001548926,
+    "n_candidates": 74,
+    "execution_time": 5.526482820510864,
+    "metrics": {
+      "n_candidates_after_filter": 74,
+      "distance_threshold_km": 1.725154410976265,
+      "occurrence_threshold_pct": 5.450086536037981,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 74,
+      "composite_score": 0.6375070001548926
+    }
+  },
+  {
+    "trial_number": 28,
+    "distance_km": 4.003810848080021,
+    "occ_pct": 4.144407488771596,
+    "root_weights": {
+      "travessa": 0.2,
+      "rio": 0.8,
+      "porto": 0.85,
+      "boca": 0.9,
+      "y": 0.95
+    },
+    "score": 0.5481965180771113,
+    "n_candidates": 8,
+    "execution_time": 12.90366005897522,
+    "metrics": {
+      "n_candidates_after_filter": 8,
+      "distance_threshold_km": 4.003810848080021,
+      "occurrence_threshold_pct": 4.144407488771596,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 0.8,
+      "map_score": 0.5,
+      "workload": 8,
+      "composite_score": 0.5481965180771113
+    }
+  },
+  {
+    "trial_number": 29,
+    "distance_km": 0.624830679548098,
+    "occ_pct": 3.354014285755527,
+    "root_weights": {
+      "travessa": 0.15,
+      "rio": 0.9,
+      "porto": 0.7,
+      "boca": 0.6,
+      "y": 0.85
+    },
+    "score": 0.6217344956626747,
+    "n_candidates": 222,
+    "execution_time": 8.497848749160767,
+    "metrics": {
+      "n_candidates_after_filter": 222,
+      "distance_threshold_km": 0.624830679548098,
+      "occurrence_threshold_pct": 3.354014285755527,
+      "n_root_weights": 5,
+      "evaluation_mode": "fast_precomputed",
+      "recall_10": 1.0,
+      "map_score": 0.5,
+      "workload": 222,
+      "composite_score": 0.6217344956626747
+    }
+  }
+]

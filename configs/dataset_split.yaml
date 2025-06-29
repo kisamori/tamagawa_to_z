@@ -1,0 +1,45 @@
+# ---- 基本パラメータ ----
+# データ分割比率 (train:val:test)
+split_ratios:
+  train: 0.0
+  val: 0.7
+  test: 0.3
+
+# 発見年フィルタ設定（各データセット別）
+discovery_year_filters:
+  train_discovery_year_min: 2015
+  train_discovery_year_max: 2030
+  val_discovery_year_min: 1700
+  val_discovery_year_max: 2030
+  test_discovery_year_min: 1700
+  test_discovery_year_max: 2030
+
+# ---- 入力ファイル設定 ----
+input_format: "kmz"  # サポート形式: kmz, csv, gpkg
+
+# ---- 文化圏タグ定義 ----
+culture_blocks:
+  acre:
+    sites: [Fazenda Atlântica, Fazenda Colorada, Fazenda Brasil, Fazenda Conceição]
+  santarem:
+    sites: [Alter do Chão, Santarém (urban core), Monte Alegre, Óbidos]
+  marajo:
+    sites: [Teso dos Bichos, Teso dos Caldeirões, Guajará, Camutins]
+  casarabe:
+    sites: [Cotoca, Landívar, Salvatierra, Loma Mendoza]
+  kuhikugu:
+    sites: [Kuhikugu (Alto Xingu), Wakupe, Hekugu, Kuarup]
+  upano:
+    sites: [Plazaloma, Campana-Cocha, Sangay, Kilamope]
+
+# ---- バッファ設定 ----
+buffer_radius_km: 0.5
+negative_ratio: 4
+
+# ---- 空間参照系 ----
+target_crs: "EPSG:4326"
+processing_crs: "EPSG:3857"  # メートル単位での計算用
+
+# ---- 統計設定 ----
+random_state: 42
+stratify_by_culture: false

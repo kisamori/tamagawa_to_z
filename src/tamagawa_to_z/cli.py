@@ -12,7 +12,7 @@ import geopandas as gpd
 from pathlib import Path
 
 # パッケージのインポート
-from tamagawa_to_z.harmonizer.preprocess import make_bbox_gdf, collect_names, collect_osm_names, merge_toponyms, process_toponyms
+from tamagawa_to_z.harmonizer.preprocess import make_bbox_gdf, process_toponyms, extract_toponyms_pyrosm
 from tamagawa_to_z.harmonizer.distance import attach_distance
 from tamagawa_to_z.harmonizer.watermask import water_occurrence
 from tamagawa_to_z.harmonizer.agent import filter_with_agent
@@ -52,11 +52,12 @@ def cli():
 
 
 @cli.command()
-@click.option("--out", default="data/interim/acre_candidates.parquet", help="出力ファイルのパス")
+@click.option("--out", default="data/output/candidates/region_candidates.parquet", help="出力ファイルのパス")
 @click.option("--rivers", default="data/raw/HydroRIVERS_SA.shp", help="HydroRIVERSファイルのパス")
 @click.option("--gsw", default="data/raw/GSW_occurrence.tif", help="GSW occurrenceファイルのパス")
+@click.option("--pbf", default="data/raw/osm/norte-latest.osm.pbf", help="PBFファイルのパス")
 @click.option("--log-level", default="INFO", help="ログレベル")
-def acre_pipeline(out, rivers, gsw, log_level):
+def acre_pipeline(out, rivers, gsw, pbf, log_level):
     """アクレ州マデイラ川上流西部のS-1〜S-5パイプラインを実行する"""
     # ロギングの設定
     setup_logging(log_level)
@@ -70,17 +71,9 @@ def acre_pipeline(out, rivers, gsw, log_level):
     
     # S-2: 水場系トポニムの抽出
     logger.info("S-2: 水場系トポニムの抽出")
-    logger.info("BNGBからトポニムを収集しています...")
-    bngb_names = collect_names(bbox)
-    logger.info(f"BNGBから{len(bngb_names)}件のトポニムを収集しました")
-    
-    logger.info("OpenStreetMapからトポニムを収集しています...")
-    osm_names = collect_osm_names(bbox)
-    logger.info(f"OpenStreetMapから{len(osm_names)}件のトポニムを収集しました")
-    
-    # トポニムのマージ
-    names = merge_toponyms(bngb_names, osm_names)
-    logger.info(f"合計{len(names)}件のトポニムを収集しました")
+    logger.info("PyrosmでローカルPBFから水語彙地名を抽出しています...")
+    names = extract_toponyms_pyrosm(bbox, pbf)
+    logger.info(f"ローカルPBFから{len(names)}件のトポニムを収集しました")
     
     # S-3: クレンジング & タイプ付け
     logger.info("S-3: クレンジング & タイプ付け")

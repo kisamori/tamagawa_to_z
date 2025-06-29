@@ -1,0 +1,34 @@
+# 地域別データパス設定ファイル
+# 新しい地域を追加する場合は、このファイルにエントリを追加してください
+
+regions:
+  acre:
+    name: "acre"
+    description: "アクレ州の考古学遺跡データ"
+    known_sites:
+      csv: "data/output/site_analysis/site_analysis_20250627_005446/site_toponym_analysis_acre.csv"
+      description: "既知考古学遺跡の地名分析データ"
+    candidate_sites:
+      csv: "data/output/site_analysis/site_analysis_20250627_113813/site_toponym_analysis_acre.csv"
+      description: "候補地の地名分析データ"
+  
+  marajo:
+    name: "marajo"
+    description: "マラジョ島の考古学遺跡データ"
+    known_sites:
+      csv: "data/output/site_analysis/site_analysis_20250627_005823/site_toponym_analysis_marajo.csv"
+      description: "既知考古学遺跡の地名分析データ"
+    candidate_sites:
+      csv: "data/output/site_analysis/site_analysis_20250627_113811/site_toponym_analysis_marajo.csv"
+      description: "候補地の地名分析データ"
+
+# 新しい地域の追加例:
+# new_region:
+#   name: "New Region"
+#   description: "新地域の説明"
+#   known_sites:
+#     csv: "path/to/known_sites.csv"
+#     description: "既知遺跡データの説明"
+#   candidate_sites:
+#     csv: "path/to/candidate_sites.csv"
+#     description: "候補地データの説明"

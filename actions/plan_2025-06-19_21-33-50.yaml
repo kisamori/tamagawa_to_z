@@ -1,0 +1,7 @@
+action: set_param
+created_at: '2025-06-19T21:33:50.694436'
+created_by: human-in-the-loop
+params:
+  dist_threshold_km: 2.0
+  occ_pct_threshold: 8
+rationale: 高精度設定：厳しい閾値で偽陽性を減らし、確実性の高い候補のみを抽出

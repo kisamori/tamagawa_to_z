@@ -1,158 +1,290 @@
-# tamagawa_to_z
+# Tamagawa to Z: Unraveling the Mysteries of Lost Rivers and Ancient Ruins in the Amazon with AI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/poetry-1.4.0+-blue.svg)](https://python-poetry.org/)
 
-アマゾン古河道・集落探索に向けた多言語トポニム解析フレームワーク
+## Introduction: In Search of Lost River Memories
 
-## 概要
+Rivers are the cradles of civilization. However, their flow is not eternal.
+Across the vast expanse of time, rivers meander and dramatically change their form. Water may have long vanished from places where civilizations once flourished.
 
-tamagawa_to_z は、アマゾン流域における古河道や集落跡の探索を支援するためのフレームワークです。
-地名データから水関連の地名を抽出・分類し、現河道との距離や水域頻度を分析することで、
-古河道候補地点を特定します。
+But what if those memories have been passed down to the present day as "place names"?
 
-## クイックスタート
+Our adventure began with such a romantic hypothesis. We wondered if the names and legends of lands might be time capsules of the soul, rooted in places even after people have left and rivers have dried up.
 
-### セットアップ
+The name of this project, "Tamagawa to Z," derives from the "Tamagawa River" in Japan, where our team members live. This river, which repeatedly flooded in the past, left the same place name "Todoroki" on both its banks. Even now, place names connect these two lands that were divided by the river and separated by time. Fascinated by the storytelling power of these place names, we decided to embark on a journey to search for the same miracle in the distant lands of the Amazon.
+
+### Our Compass: LLM and Multilingual Toponymy
+
+The history of the Amazon is a crossroads of diverse languages. Indigenous languages, languages of settlers. They mixed together, changed over time, and hid the true nature of the land behind a complex veil.
+
+Our greatest weapon is the power of LLMs to break through these language barriers and the knowledge of "toponymy (the study of place names)".
+
+We're not simply looking for words that mean "water." We had LLMs interpret countless place names scattered throughout the Amazon in multilingual contexts, comprehensively judging their etymology, semantic similarities, and historical backgrounds, thereby practicing what could be called "linguistic taxonomy." This is the work of excavating the "memories of the land" that lie dormant within words.
+
+Through this process, we created the world's only **"Multilingual Toponymic Dictionary."** This is our unique and irreplaceable compass in our long and arduous quest.
+
+### Route to Discovery
+
+We chose Acre State, Brazil, full of potential for unseen discoveries, as the stage for our adventure. This land, where "new surfaces" are continuously appearing due to deforestation and development, is truly a frontier where numerous geoglyphs have been discovered in satellite images in recent years.
+
+Our route is as follows:
+
+1.  **Listening to Voices Sleeping in Maps:** Armed with our created "Multilingual Toponymic Dictionary," we picked up place names in Acre State from OSM (OpenStreetMap) and listed places that might be related to water.
+
+2.  **Setting Course for the Past:** Our purpose is the exploration of "lost rivers." Therefore, we narrowed down to lands with "low wetness" that are at a certain distance from current rivers and suggest the possibility of former residential areas. To improve the accuracy of this narrowing down, we adjusted parameters while dialoguing with the LLM (O3 Pro) itself, using how well we could reproduce known ruins as an indicator. It was like having repeated discussions about unknown sea charts with an experienced and seasoned navigator called AI.
+
+3.  **Relying on the Stars:** Eight selected candidate sites. We scored them from multiple perspectives, including feature matching combining topography and toponymy at known ruins, possibility of destruction/burial by artifacts, unexplored survey areas, topographical advantages from satellite images, and mythological traditions.
+
+### The Promised Land: Ramal Olho D'água
+
+After countless analyses and dialogues with AI, we finally arrived at one place.
+
+| Site Name | Ramal Olho D'água |
+| :--- | :--- |
+| **Coordinates** | **-9.839247, -68.498725** |
+
+**View on Map:**
+
+<a href="https://www.google.com/maps?q=-9.839247,-68.498725">
+  <img src="docs/images/8.gif" alt="Ramal Olho D'água" width="500">
+</a>
+
+- 🌍 [Open in Google Maps](https://www.google.com/maps?q=-9.839247,-68.498725)
+
+This place is located in a true "blank zone," away from known archaeological sites.
+Satellite data suggests an ideal environment where "micro-highlands" and "low wetlands" spread in a mosaic pattern, making it easy for ancient people to build settlements.
+
+And when we investigated folk tales related to this land using the place name "Olho D'Água (Eye of Water)" as a clue, we found in the materials of an Indigenous protection organization in Acre State a description stating that **Indigenous people once lived around this very "Olho D'Água."**
+
+Following the memories of place names excavated by AI, various perspectives strongly suggest that ruins lie dormant in this place.
+
+---
+
+
+## Quick Start
+
+### Setup
+
+**Prerequisites:**
+- Python 3.10 or higher is required (does not work with 3.8 or 3.9)
+- Geospatial libraries (especially pyproj, geopandas) require Python 3.10 or higher
 
 ```bash
-# 1. リポジトリのクローン
+# 1. Clone the repository
 git clone https://github.com/username/tamagawa_to_z.git
 cd tamagawa_to_z
 
-# 2. Poetry を使用してインストール
+# 2. Install using Poetry
 poetry install
-
-# 3. 必要なデータを配置
-# HydroRIVERS_SA.shp と GSW_occurrence.tif を data/raw/ に配置
 ```
 
-### Jupyter Notebookでの実行
+### 3. Place Required Data
+
+#### Required Data Files
+
+| File Name | Content | Source | Role |
+|-----------|---------|--------|------|
+| `HydroRIVERS_SA.shp` | South America river network (~95MB) | [HydroSHEDS](https://hydrosheds.org) | Distance calculation from current rivers |
+| `GSW_occurrence.tif` | Water surface occurrence frequency data (1984-2021) | [GSW Portal](https://global-surface-water.appspot.com) | Water area frequency determination |
+| OSM data files | Northern South America & BR regional OSM data | [Geofabrik](https://download.geofabrik.de/south-america.html) | Place name data extraction |
+
+**Note:** Individual download required due to large file sizes.
+
+### Manual Download Procedure
+
+#### 1. Obtaining HydroRIVERS
+```bash
+# Download and extract
+wget -O hydrorivers_sa.zip "https://data.hydrosheds.org/file/HydroRIVERS/SA_HydroRIVERS_v10_shp.zip"
+unzip hydrorivers_sa.zip -d data/raw/hydrorivers_sa
+```
+
+#### 2. Obtaining GSW occurrence
+1. Download tiles for 80°W~40°W / 0°~20°S from [GSW Portal](https://global-surface-water.appspot.com)
+2. Place downloaded files in GSW_occurrence directory:
+```bash
+mkdir -p data/raw/GSW_occurrence
+# Move downloaded tile files to this directory
+mv occurrence_*.tif data/raw/GSW_occurrence/
+```
+
+#### 3. Obtaining OSM Data
+```bash
+# Create OSM directory
+mkdir -p data/raw/osm
+
+# Download OSM data for northern South America and various Brazilian regions
+wget -O data/raw/osm/bolivia-latest.osm.pbf "https://download.geofabrik.de/south-america/bolivia-latest.osm.pbf"
+wget -O data/raw/osm/peru-latest.osm.pbf "https://download.geofabrik.de/south-america/peru-latest.osm.pbf"
+wget -O data/raw/osm/centro-oeste-latest.osm.pbf "https://download.geofabrik.de/south-america/brazil/centro-oeste-latest.osm.pbf"
+wget -O data/raw/osm/nordeste-latest.osm.pbf "https://download.geofabrik.de/south-america/brazil/nordeste-latest.osm.pbf"
+wget -O data/raw/osm/norte-latest.osm.pbf "https://download.geofabrik.de/south-america/brazil/norte-latest.osm.pbf"
+wget -O data/raw/osm/sudeste-latest.osm.pbf "https://download.geofabrik.de/south-america/brazil/sudeste-latest.osm.pbf"
+wget -O data/raw/osm/sul-latest.osm.pbf "https://download.geofabrik.de/south-america/brazil/sul-latest.osm.pbf"
+```
+
+#### 4. Placement Verification
+```bash
+ls data/raw/hydrorivers_sa/   # Confirm HydroRIVERS files exist
+ls data/raw/GSW_occurrence/   # Confirm GSW occurrence tiles exist
+ls data/raw/osm/      # Confirm OSM files for each region exist
+```
+### Running with Jupyter Notebook
 
 ```bash
-# Jupyter Notebookを起動
+# Launch Jupyter Notebook
 poetry run jupyter notebook notebooks/01_harmonizer.ipynb
 ```
 
-## インストール
+## Installation
 
-### Poetry を使用する場合（推奨）
+**Note:** This project requires Python 3.10 or higher. Please use pyenv or similar to set the appropriate Python version.
+
+### Using Poetry (Recommended)
 
 ```bash
-# リポジトリのクローン
+# Clone repository
 git clone https://github.com/username/tamagawa_to_z.git
 cd tamagawa_to_z
 
-# Poetry を使用してインストール
+# Install using Poetry
 poetry install
 ```
 
-### Kaggle で使用する場合
+### Using with Kaggle
+
+**Note:** Please select Python 3.10 or higher runtime in Kaggle as well.
 
 ```bash
-# requirements.txt を使用してインストール
+# Install using requirements.txt
 pip install -r requirements.txt
+
+# Or write at the beginning of Kaggle notebook as follows
+!pip install git+https://github.com/kisamori/tamagawa_to_z.git
 ```
 
-## 使い方
+## Usage
 
-### Jupyter Notebook
+This project explores Amazon ancient ruin candidate sites by combining AI and geospatial data.
 
-`notebooks/01_harmonizer.ipynb` を使用して、アクレ州マデイラ川上流西部の水場系トポニムを抽出し、古河道候補地点を特定します。
+**For detailed usage instructions, please refer to [scripts/README.md](scripts/README.md).**
 
-```python
-# パッケージのインポート
-from tamagawa_to_z.harmonizer import (
-    make_bbox_gdf, collect_names, collect_osm_names, merge_toponyms, process_toponyms,
-    attach_distance, water_occurrence, filter_candidates, score_candidates
-)
+> ⚠️ **Important Note:** Running all the scripts in sequence takes a very long time and reproducibility cannot be guaranteed due to LLM uncertainty. We have created a presentation notebook that loads dumped results from each pipeline stage to demonstrate the complete workflow efficiently.
+>
+> 📊 **Quick Demo:** For a comprehensive overview of the entire pipeline with pre-computed results, see:  
+> **[notebooks/00_presentation.ipynb](notebooks/00_presentation.ipynb)**
 
-# S-1: 対象地域のBBox定義
-bbox = make_bbox_gdf()
+### Basic Workflow
 
-# S-2: 水場系トポニムの抽出
-bngb_names = collect_names(bbox.geometry.iloc[0])
-osm_names = collect_osm_names(bbox.geometry.iloc[0])
-names = merge_toponyms(bngb_names, osm_names)
+1. **Data Preparation** - Split known ruin data (train/validation/test)
+2. **Parameter Optimization** - Optimization using Bayesian Optimization + LLM
+3. **Candidate Site Prediction** - Extract candidate sites with optimal parameters
+4. **Evaluation & Analysis** - Result evaluation and improvement suggestions by AI agents
 
-# S-3: クレンジング & タイプ付け
-names = process_toponyms(names)
+### Quick Execution
 
-# S-4: 現河道との距離計算
-names = attach_distance(names, "data/raw/HydroRIVERS_SA.shp")
+```bash
+# 1. Data splitting
+python scripts/run_split.py --config configs/dataset_split.yaml
 
-# S-5: "川が無いのに川名が残る"ポイント抽出
-names = water_occurrence(names, "data/raw/GSW_occurrence.tif")
-candidates = filter_candidates(names)
-candidates = score_candidates(candidates)
+# 2. Parameter optimization
+python scripts/run_optuna.py --config configs/optuna_run.yaml --trials 50
 
-# 結果の保存
-candidates.to_parquet("data/interim/acre_candidates.parquet")
+# 3. Run prediction (evaluation & analysis also run automatically)
+python scripts/run_best_params.py --params data/output/optuna/.../best_params.json --run-analysis
 ```
 
-## プロジェクト構成
+### Analysis Workflow
+
+For detailed analysis flow, please refer to the following Jupyter Notebook:
+
+**📊 Main Workflow (Planned):** `notebooks/analysis_workflow.ipynb`
+
+This notebook explains the following analysis procedures step by step:
+- Building a multilingual toponymic dictionary
+- Collection and preprocessing of place name data
+- Extraction of candidate sites using machine learning
+- Evaluation and visualization of results
+
+## Project Structure
 
 ```
 tamagawa_to_z/
-├── README.md           # このファイル
-├── LICENSE             # MITライセンス
-├── pyproject.toml      # Poetry設定
-├── requirements.txt    # Kaggle用依存関係
-├── .gitignore          # Git除外設定
+├── README.md              # This file
+├── LICENSE                # MIT License  
+├── pyproject.toml         # Poetry configuration (Python 3.10+ required)
+├── requirements.txt       # Kaggle dependencies
 │
-├── notebooks/          # 実験・可視化・デモ
-│   └── 01_harmonizer.ipynb  # アクレ州パイプライン実行
+├── scripts/               # CLI execution scripts
+│   ├── README.md             # Detailed usage instructions
+│   ├── run_split.py          # Data splitting
+│   ├── run_optuna.py         # Hyperparameter optimization
+│   ├── run_best_params.py    # Best parameter execution
+│   ├── run_inspector.py      # Evaluation analysis
+│   └── run_researcher.py     # Improvement suggestions
 │
-├── src/                # パッケージ本体
+├── configs/               # Configuration files
+│   ├── optuna_space.yaml     # Optimization parameter space definition
+│   └── dataset_split.yaml    # Data splitting configuration
+│
+├── notebooks/             # Experiments, visualization, demos
+│   ├── 01_harmonizer.ipynb      # Main processing demo
+│   └── 99_kaggle_demo.ipynb     # Kaggle demo
+│
+├── src/                   # Package main body
 │   └── tamagawa_to_z/
-│       ├── __init__.py
-│       ├── harmonizer/        # 多言語トポニム解析
-│       │   ├── __init__.py
-│       │   ├── preprocess.py  # S-1, S-2, S-3
-│       │   ├── distance.py    # S-4
-│       │   ├── watermask.py   # S-5 (GSW)
-│       │   └── agent.py       # S-5 (閾値判定)
-│       └── utils/             # ユーティリティ
-│           └── __init__.py
+│       ├── harmonizer/           # Multilingual toponymic analysis
+│       ├── tuning/               # Hyperparameter optimization
+│       ├── inspector_agent/      # Evaluation & analysis agent
+│       ├── researcher_agent/     # Improvement suggestion agent
+│       ├── site_analysis/        # Site analysis tools
+│       └── utils/                # Utilities
 │
-├── tests/              # テスト
-│   └── test_harmonizer.py
+├── tests/                 # Tests
 │
-└── data/               # データ（Gitに含めない）
-    ├── raw/            # 入力データ
-    │   ├── HydroRIVERS_SA.shp  # 南米河川ネットワーク
-    │   └── GSW_occurrence.tif  # 水域頻度
-    └── interim/        # 中間データ
-        └── acre_candidates.parquet  # 候補地点
+└── data/               # Data (not included in Git)
+    ├── raw/            # Input data
+    │   ├── hydrorivers_sa/         # HydroRIVERS data
+    │   │   └── HydroRIVERS_v10_sa.shp  # South America river network
+    │   ├── GSW_occurrence/         # Global Surface Water data
+    │   │   └── occurrence_*.tif        # Water surface occurrence frequency tiles
+    │   └── osm/                    # OSM data
+    │       ├── bolivia-latest.osm.pbf     # Bolivia
+    │       ├── peru-latest.osm.pbf        # Peru
+    │       ├── centro-oeste-latest.osm.pbf # Brazil Central-West
+    │       ├── nordeste-latest.osm.pbf    # Brazil Northeast
+    │       ├── norte-latest.osm.pbf       # Brazil North
+    │       ├── sudeste-latest.osm.pbf     # Brazil Southeast
+    │       └── sul-latest.osm.pbf         # Brazil South
+    ├── known/          # Known site data
+    │   └── known_acre.kmz          # Training known sites (KMZ format)
+    ├── splits/         # Data splitting results
+    │   ├── train.gpkg  # Training data
+    │   ├── val.gpkg    # Validation data
+    │   └── test.gpkg   # Test data
+    └── output/         # Output results
+        └── optuna/     # Optimization results
+            ├── 20250623_152052/    # Timestamp directory
+            │   ├── best_params.json
+            │   ├── best_run_val_candidates.csv
+            │   └── best_run_test_time_candidates.csv
+            └── optuna.db           # Optuna SQLite DB
 ```
 
-## データソース
+## License
 
-| カテゴリ | データセット | 主用途 |
-| --- | --- | --- |
-| 地名 | **BNGB** (IBGE API) ([ibge.gov.br][1]) | 正式ガゼティア |
-|  | **OpenStreetMap / Overpass API** ([wiki.openstreetmap.org][2]) | 俗称・小水系補完 |
-| 河川網 | **HydroRIVERS (HydroSHEDS)** ([hydrosheds.org][3]) | 現況河道ベクター |
-| 水域履歴 | **JRC Global Surface Water (1984‑2021)** ([global-surface-water.appspot.com][4]) | 過去水出現確率 |
+This project is published under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-[1]: https://www.ibge.gov.br/
-[2]: https://wiki.openstreetmap.org/wiki/Overpass_API
-[3]: https://www.hydrosheds.org/
-[4]: https://global-surface-water.appspot.com/
+## Citation
 
-## ライセンス
-
-このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
-
-## 引用
-
-このプロジェクトを引用する場合は、以下の形式を使用してください：
+When citing this project, please use the following format:
 
 ```
 @software{tamagawa_to_z,
   author = {tamagawa_to_z Contributors},
-  title = {tamagawa_to_z: アマゾン古河道・集落探索フレームワーク},
+  title = {tamagawa_to_z: Amazon Ancient River Channel and Settlement Exploration Framework},
   year = {2025},
   url = {https://github.com/username/tamagawa_to_z}
 }

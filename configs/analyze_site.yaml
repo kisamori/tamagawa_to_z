@@ -1,0 +1,110 @@
+# 既知遺跡周辺地名分析設定ファイル
+# 使用方法: python scripts/run_analyze_site.py --region acre
+
+analysis:
+  # デフォルト検索半径（km）
+  default_radius_km: 3.0
+  
+  # OSM地名抽出モード（data/config/osm_keys.yamlのextraction_modesを参照）
+  osm_keys_mode: "balanced"
+  
+  # 極座標システム設定
+  polar_coordinate_system:
+    angle_reference: "north"      # 北を0度基準
+    angle_direction: "clockwise"  # 時計回り
+    angle_unit: "degrees"         # 角度単位（degrees）
+    distance_unit: "km"           # 距離単位（km）
+
+# 出力設定
+output:
+  # 出力ベースディレクトリ
+  base_dir: "data/output/site_analysis"
+  
+  # タイムスタンプディレクトリ名フォーマット
+  timestamp_dir_format: "site_analysis_%Y%m%d_%H%M%S"
+  
+  # CSVファイル名（{region}は地域名で置換）
+  csv_filename: "site_toponym_analysis_{region}.csv"
+  
+  # 設定バックアップファイル名
+  config_backup: "analysis_config.yaml"
+  
+  # ログファイル名
+  log_filename: "analysis_log.txt"
+  
+  # 可視化画像ディレクトリ
+  visualization_dir: "visualizations"
+
+# CSV出力フォーマット
+csv_format:
+  # 出力列の定義
+  columns:
+    - "site_name"      # 遺跡名
+    - "toponym_name"   # 地名
+    - "angle"          # 遺跡からの角度（度）
+    - "radius"         # 遺跡からの距離（km）
+    - "river_angle"    # 最寄り河川への角度（度）
+    - "river_radius"   # 最寄り河川への距離（km）
+    - "region"         # 地域名
+    - "culture_tag"    # 文化タグ
+  
+  # 数値精度設定
+  decimal_places:
+    angle: 2
+    radius: 3
+    river_angle: 2
+    river_radius: 3
+
+# 可視化設定
+visualization:
+  # 図のサイズ（インチ）
+  figure_size: [12, 8]
+  
+  # DPI設定
+  dpi: 300
+  
+  # 出力フォーマット
+  format: "png"
+  
+  # 地図背景設定
+  map_background:
+    provider: "OpenStreetMap.Mapnik"  # contextilyプロバイダー
+    zoom_level: "auto"                # 自動ズーム
+    alpha: 0.7                        # 背景透明度
+
+# 処理設定
+processing:
+  # 地名抽出時の最小文字数
+  min_toponym_length: 2
+  
+  # 重複地名の処理方法
+  duplicate_handling: "keep_closest"  # keep_closest, keep_all, keep_first
+  
+  # 川距離計算の最大検索距離（km）
+  max_river_search_distance: 50.0
+  
+  # 遺跡数制限（テスト用、0で無制限）
+  max_sites_limit: 0
+  
+  # 並列処理設定
+  parallel_processing:
+    enabled: true
+    max_workers: 4
+
+# ログ設定
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  include_console: true
+  include_file: true
+
+# デバッグ設定
+debug:
+  # 中間結果の保存
+  save_intermediate_results: false
+  
+  # 詳細ログの出力
+  verbose_logging: false
+  
+  # 処理時間の計測
+  measure_execution_time: true

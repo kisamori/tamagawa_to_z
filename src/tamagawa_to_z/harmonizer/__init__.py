@@ -9,9 +9,6 @@ from tamagawa_to_z.harmonizer.preprocess import (
     normalize_name,
     infer_type,
     make_bbox_gdf,
-    collect_names,
-    collect_osm_names,
-    merge_toponyms,
     process_toponyms
 )
 
@@ -22,16 +19,31 @@ from tamagawa_to_z.harmonizer.distance import (
 )
 
 from tamagawa_to_z.harmonizer.watermask import (
-    water_occurrence,
     buffer_occurrence,
     classify_by_occurrence,
     find_paleo_candidates
+)
+
+from tamagawa_to_z.harmonizer.watermask_safe import (
+    water_occurrence_with_fallback as water_occurrence
 )
 
 from tamagawa_to_z.harmonizer.agent import (
     filter_candidates,
     score_candidates
 )
+
+# LLMレイヤーのインポート（条件付き）
+try:
+    from tamagawa_to_z.harmonizer.llm_layer import (
+        ToponymHarmonizer,
+        ToponymEmbedding,
+        load_dict,
+        append_entries
+    )
+    _has_llm_layer = True
+except ImportError:
+    _has_llm_layer = False
 
 # メインクラスのインポート（条件付き）
 try:
@@ -46,9 +58,6 @@ __all__ = [
     'normalize_name',
     'infer_type',
     'make_bbox_gdf',
-    'collect_names',
-    'collect_osm_names',
-    'merge_toponyms',
     'process_toponyms',
     
     # distance
@@ -66,6 +75,15 @@ __all__ = [
     'filter_candidates',
     'score_candidates'
 ]
+
+# LLMレイヤーが利用可能な場合は__all__に追加
+if _has_llm_layer:
+    __all__.extend([
+        'ToponymHarmonizer',
+        'ToponymEmbedding', 
+        'load_dict',
+        'append_entries'
+    ])
 
 # Harmonizerクラスが利用可能な場合は__all__に追加
 if _has_harmonizer:
