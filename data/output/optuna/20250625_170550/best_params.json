@@ -1,0 +1,328 @@
+{
+  "score": 0.6439667330139108,
+  "distance_km": 2.4231129217932335,
+  "occ_pct": 4.215049460538199,
+  "root_weights": {
+    "travessa": 0.2,
+    "rio": 0.9,
+    "porto": 0.8,
+    "boca": 0.75,
+    "y": 0.95
+  },
+  "trial_number": 25,
+  "optimization_history": [
+    {
+      "trial_number": 0,
+      "score": -0.05
+    },
+    {
+      "trial_number": 1,
+      "score": 0.6417354962027739
+    },
+    {
+      "trial_number": 2,
+      "score": 0.6417354962027739
+    },
+    {
+      "trial_number": 3,
+      "score": -0.05
+    },
+    {
+      "trial_number": 4,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 5,
+      "score": 0.6391396459463318
+    },
+    {
+      "trial_number": 6,
+      "score": -0.05
+    },
+    {
+      "trial_number": 7,
+      "score": 0.6257478535743957
+    },
+    {
+      "trial_number": 8,
+      "score": -0.05
+    },
+    {
+      "trial_number": 9,
+      "score": 0.6412275708105407
+    },
+    {
+      "trial_number": 10,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 11,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 12,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 13,
+      "score": 0.6211618077982183
+    },
+    {
+      "trial_number": 14,
+      "score": -0.05
+    },
+    {
+      "trial_number": 15,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 16,
+      "score": 0.6272824020923748
+    },
+    {
+      "trial_number": 17,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 18,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 19,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 20,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 21,
+      "score": 0.6295454158392051
+    },
+    {
+      "trial_number": 22,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 23,
+      "score": 0.6347080675084554
+    },
+    {
+      "trial_number": 24,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 25,
+      "score": 0.6439667330139108
+    },
+    {
+      "trial_number": 26,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 27,
+      "score": 0.6375070001548926
+    },
+    {
+      "trial_number": 28,
+      "score": 0.5481965180771113
+    },
+    {
+      "trial_number": 29,
+      "score": 0.6217344956626747
+    }
+  ],
+  "best_candidates": [
+    {
+      "name": "Praça Barão do Rio Branco",
+      "lat": -1.45091925447308,
+      "lon": -48.500444019360664,
+      "type": "rio",
+      "total_score": 0.898538272393111,
+      "distance_km": 2.764115173792601,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Rua Porto Palmeira",
+      "lat": -1.4601998445187776,
+      "lon": -48.50623671459073,
+      "type": "porto",
+      "total_score": 0.8369017893483348,
+      "distance_km": 2.8732140434443414,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Vila Porto do Sal",
+      "lat": -1.4596300051423348,
+      "lon": -48.50661762697753,
+      "type": "porto",
+      "total_score": 0.8360408835349016,
+      "distance_km": 2.930607764339892,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Porto Beiradão",
+      "lat": -1.4585622549057007,
+      "lon": -48.506683349609375,
+      "type": "porto",
+      "total_score": 0.8354262516040282,
+      "distance_km": 2.971583226398119,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Mario Dias",
+      "lat": -1.265887552486928,
+      "lon": -48.56237645426686,
+      "type": "rio",
+      "total_score": 0.8134316695576189,
+      "distance_km": 8.437888696158737,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Mario Dias",
+      "lat": -1.2654817833373442,
+      "lon": -48.561052554072866,
+      "type": "rio",
+      "total_score": 0.8127311703027004,
+      "distance_km": 8.484588646486646,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Batista Campos",
+      "lat": -0.1651548897631019,
+      "lon": -49.98030525074117,
+      "type": "travessa",
+      "total_score": 0.4836351240296103,
+      "distance_km": 2.424325064692647,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Gurupá",
+      "lat": -1.4596639981268562,
+      "lon": -48.502352107488896,
+      "type": "travessa",
+      "total_score": 0.48287317783227857,
+      "distance_km": 2.475121477848091,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Major Joaquim Távora",
+      "lat": -1.457606733055614,
+      "lon": -48.501702793590894,
+      "type": "travessa",
+      "total_score": 0.48264541098955593,
+      "distance_km": 2.4903059340296085,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Sete de Setembro",
+      "lat": -1.4546513557434082,
+      "lon": -48.50047492980957,
+      "type": "travessa",
+      "total_score": 0.4821409980690865,
+      "distance_km": 2.5239334620608984,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa de Breves",
+      "lat": -1.4618128538131714,
+      "lon": -48.50350761413574,
+      "type": "travessa",
+      "total_score": 0.4819603752292152,
+      "distance_km": 2.535974984718988,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Minas Gerais",
+      "lat": -1.4988099336624146,
+      "lon": -48.695858001708984,
+      "type": "travessa",
+      "total_score": 0.4816927339757885,
+      "distance_km": 2.553817734947428,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa de Breves",
+      "lat": -1.4615976810455322,
+      "lon": -48.5036506652832,
+      "type": "travessa",
+      "total_score": 0.48164922022907986,
+      "distance_km": 2.556718651394677,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa de Breves",
+      "lat": -1.4615153670310974,
+      "lon": -48.50366020202637,
+      "type": "travessa",
+      "total_score": 0.48160311184383486,
+      "distance_km": 2.5597925437443427,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa de Breves",
+      "lat": -1.461429476737976,
+      "lon": -48.5036678314209,
+      "type": "travessa",
+      "total_score": 0.4815583029362517,
+      "distance_km": 2.5627798042498866,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Alenquer",
+      "lat": -1.460379869599536,
+      "lon": -48.503614583443664,
+      "type": "travessa",
+      "total_score": 0.4812074418897533,
+      "distance_km": 2.586170540683112,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Capitão Pedro Albuquerque",
+      "lat": -1.459004906433162,
+      "lon": -48.50368884143266,
+      "type": "travessa",
+      "total_score": 0.4804064640402753,
+      "distance_km": 2.639569063981648,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Sete de Setembro",
+      "lat": -1.4538428018709468,
+      "lon": -48.501451687330494,
+      "type": "travessa",
+      "total_score": 0.4800411135920418,
+      "distance_km": 2.6639257605305446,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Félix Roque",
+      "lat": -1.455530047416687,
+      "lon": -48.50253105163574,
+      "type": "travessa",
+      "total_score": 0.47989062344218214,
+      "distance_km": 2.6739584371878515,
+      "water_occurrence_pct": 0.0
+    },
+    {
+      "name": "Travessa Major Joaquim Távora",
+      "lat": -1.4576628017910758,
+      "lon": -48.50359915434581,
+      "type": "travessa",
+      "total_score": 0.4797650336772119,
+      "distance_km": 2.6823310881858693,
+      "water_occurrence_pct": 0.0
+    }
+  ],
+  "objective_components": {
+    "n_candidates_after_filter": 47,
+    "distance_threshold_km": 2.4231129217932335,
+    "occurrence_threshold_pct": 4.215049460538199,
+    "n_root_weights": 5,
+    "evaluation_mode": "fast_precomputed",
+    "recall_10": 1.0,
+    "map_score": 0.5,
+    "workload": 47,
+    "composite_score": 0.6439667330139108
+  }
+}
