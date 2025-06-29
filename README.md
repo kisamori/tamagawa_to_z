@@ -171,6 +171,11 @@ This project explores Amazon ancient ruin candidate sites by combining AI and ge
 
 **For detailed usage instructions, please refer to [scripts/README.md](scripts/README.md).**
 
+> ⚠️ **Important Note:** Running all the scripts in sequence takes a very long time and reproducibility cannot be guaranteed due to LLM uncertainty. We have created a presentation notebook that loads dumped results from each pipeline stage to demonstrate the complete workflow efficiently.
+>
+> 📊 **Quick Demo:** For a comprehensive overview of the entire pipeline with pre-computed results, see:  
+> **[notebooks/00_presentation.ipynb](notebooks/00_presentation.ipynb)**
+
 ### Basic Workflow
 
 1. **Data Preparation** - Split known ruin data (train/validation/test)
